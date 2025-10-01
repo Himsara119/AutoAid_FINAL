@@ -1,0 +1,1 @@
+// holds runApp, Firebase init (from bootstrap), uses app_router
