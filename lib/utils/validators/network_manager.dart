@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
-import '../../common/widgets/loaders/animation_loader.dart';
 
 class NetworkManager extends GetxController {
   static NetworkManager get instance => Get.find();
@@ -25,7 +24,7 @@ class NetworkManager extends GetxController {
     _connectionStatus.value = result;
 
     if (result == ConnectivityResult.none) {
-      TLoaders.warningSnackBar(title: 'No Internet Connection');
+      //TLoaders.warningSnackBar(title: 'No Internet Connection');
     }
   }
 
