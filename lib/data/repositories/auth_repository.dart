@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:finalapp/features/ai/screens/ai_chat_screen.dart';
 import 'package:finalapp/features/auth/screens/forget_password_screen.dart';
 import 'package:finalapp/features/auth/screens/login_screen.dart';
 import 'package:finalapp/features/auth/screens/signup_screen.dart';
 import 'package:finalapp/features/dashboard/screens/dashboard_screen.dart';
 import 'package:finalapp/features/documents/screens/doc_detail_screen.dart';
 import 'package:finalapp/features/documents/screens/replace_doc_screen.dart';
+import 'package:finalapp/features/notifications/screens/notifications_screen.dart';
 import 'package:finalapp/features/reports/screens/report_builder_screen.dart';
 import 'package:finalapp/features/services/presentation/add_service_screen.dart';
 import 'package:finalapp/features/services/presentation/edit_service_screen.dart';
@@ -44,8 +46,8 @@ class AuthenticationRepository extends GetxController {
 
     ///Check if it's the first time launching the app
     deviceStorage.read('IsFirstTime') != true
-        ? Get.offAll(() => const EditServiceRecordScreen())
-        : Get.offAll(const EditServiceRecordScreen());
+        ? Get.offAll(() => const NotificationsScreen())
+        : Get.offAll(const NotificationsScreen());
   }
 
 
