@@ -21,7 +21,6 @@ import 'package:get_storage/get_storage.dart';
 
 import '../../../utils/validators/exceptions.dart';
 import '../../features/documents/screens/upload_doc_screen.dart';
-import '../../features/mechanics/screens/mechanic_map_screen.dart';
 
 class AuthenticationRepository extends GetxController {
   static AuthenticationRepository get instance => Get.find();
@@ -47,8 +46,8 @@ class AuthenticationRepository extends GetxController {
 
     ///Check if it's the first time launching the app
     deviceStorage.read('IsFirstTime') != true
-        ? Get.offAll(() => const FindMechanicScreen())
-        : Get.offAll(const FindMechanicScreen());
+        ? Get.offAll(() => const NotificationsScreen())
+        : Get.offAll(const NotificationsScreen());
   }
 
 
