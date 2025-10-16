@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:finalapp/features/ai/screens/ai_chat_screen.dart';
 import 'package:finalapp/features/auth/screens/forget_password_screen.dart';
 import 'package:finalapp/features/auth/screens/login_screen.dart';
 import 'package:finalapp/features/auth/screens/signup_screen.dart';
