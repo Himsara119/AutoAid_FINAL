@@ -1,65 +1,53 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
-
-import '../../../utils/validators/exceptions.dart';
-
-class AuthenticationRepository extends GetxController {
-  static AuthenticationRepository get instance => Get.find();
-
-
-  ///Variables
-  final deviceStorage = GetStorage();
+class AuthRepository {
   final _auth = FirebaseAuth.instance;
+  final _db = FirebaseFirestore.instance;
 
-  ///Called from main.dart on app launch
-  @override
-  void onReady() {
-    ///Remove the native splash screen
-    FlutterNativeSplash.remove();
+  /// Watch authentication state changes
+  Stream<User?> authState() => _auth.authStateChanges();
 
-    ///Redirect to the appropriate screen
-    screenRedirect();
+  /// Sign in existing user
+  Future<UserCredential> signInWithEmail(String email, String password) =>
+      _auth.signInWithEmailAndPassword(email: email, password: password);
+
+  /// Register new user and create Firestore document
+  Future<UserCredential> registerWithEmail({
+    required String email,
+    required String password,
+    required String displayName,
+    String role = 'user',
+  }) async {
+    final cred = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    await _db.collection('users').doc(cred.user!.uid).set({
+      'display_name': displayName,
+      'email': email,
+      'role': role,
+      'deleted': false,
+      'settings': {'push_enabled': true, 'locale': 'en', 'theme': 'light'},
+      'created_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    });
+
+    return cred;
   }
 
-  screenRedirect() async {
-    ///Local Storage
-    deviceStorage.writeIfNull('IsFirstTime', true);
+  /// Send a password reset email
+  Future<void> sendPasswordReset(String email) =>
+      _auth.sendPasswordResetEmail(email: email);
 
-    ///Check if it's the first time launching the app
-    ///deviceStorage.read('IsFirstTime') != true
-        //? Get.offAll(() => const LoginScreen())
-        //: Get.offAll(const LoginScreen());
-  }
+  /// Sign out the user
+  Future<void> signOut() => _auth.signOut();
 
-
-  ///-------------------- Email & Password Sign-In--------------------------------------
-
-
-  /// [EmailAuthentication] - SignIN
-  /// [EmailAuthentication] - REGISTER
-  Future<UserCredential> registerWithEmailAndPassword(String email,
-      String password) async {
-    try {
-      return await _auth.createUserWithEmailAndPassword(
-          email: email, password: password);
-    } on FirebaseAuthException catch (e) {
-      throw TFirebaseAuthException(e.code).message;
-    } on FirebaseException catch (e) {
-      throw TFirebaseException(e.code).message;
-    } on FormatException catch (_) {
-      throw const TFormatException();
-    } on PlatformException catch (e) {
-      throw TPlatformException(e.code).message;
-    } catch (e) {
-      throw 'Something went wrong. Please try again';
-    }
+  /// Fetch currently logged-in user's Firestore profile
+  Future<DocumentSnapshot<Map<String, dynamic>>> getProfile() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) throw Exception("No logged-in user");
+    return _db.collection('users').doc(uid).get();
   }
 }
-
-
-

@@ -1,27 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
-import 'package:get/get.dart';
+import '../../features/auth/model/user_model.dart';
 
-import '../../../utils/validators/exceptions.dart';
+class UserRepository {
+  final _db = FirebaseFirestore.instance;
+  CollectionReference<Map<String, dynamic>> get _col => _db.collection('users');
 
-class UserRepository extends GetxController {
-  static UserRepository get instance => Get.find();
+  Future<UserModel?> getById(String uid) async {
+    final d = await _col.doc(uid).get();
+    return d.exists ? UserModel.fromDoc(d) : null;
+  }
 
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  Future<void> update(String uid, Map<String, dynamic> patch) =>
+      _col.doc(uid).update({...patch, 'updated_at': FieldValue.serverTimestamp()});
 
-  //Future<void> saveUserRecord(UserModel user) async {
-   // try{
-    //  await _db.collection("Users").doc(user.id).set(user.toJson());
-    //} on FirebaseException catch (e) {
-     // throw TFirebaseException(e.code).message;
-    //} on FormatException catch (_) {
-      //throw const TFormatException();
-    //} on PlatformException catch (e) {
-     // throw TPlatformException(e.code).message;
-    //} catch (e) {
-      //throw 'Something went wrong. Please try again';
-    //}
-  //}
+  Future<void> addDeviceToken(String uid, String token, {required String platform}) =>
+      _col.doc(uid).collection('device_tokens').doc(token).set({
+        'platform': platform, 'last_seen_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 }
-
