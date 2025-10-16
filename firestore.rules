@@ -1,0 +1,119 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'admin';
+    }
+
+    // ===== USERS =====
+    match /users/{user_id} {
+      allow read, write: if isAdmin() || (isSignedIn() && uid() == user_id);
+
+      match /device_tokens/{token} {
+        allow read, write: if isAdmin() || (isSignedIn() && uid() == user_id);
+      }
+    }
+
+    // ===== DEALERSHIPS =====
+    match /dealerships/{dId} {
+      allow read: if isAdmin() || isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== VEHICLES =====
+    match /vehicles/{vId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+
+      match /logs/{logId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+      }
+
+      match /ownership_transfers/{tId} {
+        allow read: if isSignedIn() || isAdmin();
+        allow write: if isAdmin();
+      }
+    }
+
+    // ===== CUSTOMERS =====
+    match /customers/{cId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== APPOINTMENTS =====
+    match /appointments/{aId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== SERVICE ORDERS =====
+    match /service_orders/{soId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+
+      match /items/{itemId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+      }
+    }
+
+    // ===== INVOICES =====
+    match /invoices/{invId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== PAYMENTS =====
+    match /payments/{payId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== DOCUMENTS =====
+    match /documents/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== REMINDERS =====
+    match /reminders/{rId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== NOTIFICATIONS =====
+    match /notifications/{nId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== AI DIAGNOSES =====
+    match /ai_diagnoses/{aiId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== MEDIA =====
+    match /media/{mId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ===== AUDIT LOGS =====
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}

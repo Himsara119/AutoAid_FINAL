@@ -1,0 +1,29 @@
+{
+  "dependencies": {
+    "firebase": "^12.3.0",
+    "firebase-admin": "^13.5.0"
+  },
+  "name": "hnd_final_project",
+  "version": "1.0.0",
+  "description": "HND Final Project",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Himsara119/AutoAid_FINAL.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Himsara119/AutoAid_FINAL/issues"
+  },
+  "homepage": "https://github.com/Himsara119/AutoAid_FINAL#readme"
+}

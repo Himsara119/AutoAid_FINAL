@@ -1,0 +1,28 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "autoaid-dev",
+          "appId": "1:658908988315:android:fe65a555b03cc3cc6b973e",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "autoaid-dev",
+          "configurations": {
+            "android": "1:658908988315:android:fe65a555b03cc3cc6b973e",
+            "ios": "1:658908988315:ios:046ff129720c63716b973e"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "autoaid",
+    "location": "asia-south1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

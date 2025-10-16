@@ -7,7 +7,7 @@ class InvoicesRepository {
 
   final FirebaseFirestore _db;
   CollectionReference<Map<String, dynamic>> get _col =>
-      _db.collection('invoices');
+       _db.collection('invoices');
 
   Future<String> createFromServiceOrder(String serviceOrderId) async {
     final orderRef = _db.collection('service_orders').doc(serviceOrderId);
