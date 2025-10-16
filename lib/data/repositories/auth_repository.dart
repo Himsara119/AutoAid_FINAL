@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:finalapp/features/auth/screens/login_screen.dart';
 import 'package:finalapp/features/dashboard/screens/dashboard_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
@@ -32,8 +33,8 @@ class AuthenticationRepository extends GetxController {
 
     ///Check if it's the first time launching the app
     deviceStorage.read('IsFirstTime') != true
-        ? Get.offAll(() => const dashboard())
-        : Get.offAll(const dashboard());
+        ? Get.offAll(() => const LoginScreen())
+        : Get.offAll(const LoginScreen());
   }
 
 
