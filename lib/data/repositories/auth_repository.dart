@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finalapp/features/auth/screens/login_screen.dart';
+import 'package:finalapp/features/auth/screens/signup_screen.dart';
 import 'package:finalapp/features/dashboard/screens/dashboard_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
@@ -33,34 +34,62 @@ class AuthenticationRepository extends GetxController {
 
     ///Check if it's the first time launching the app
     deviceStorage.read('IsFirstTime') != true
-        ? Get.offAll(() => const LoginScreen())
-        : Get.offAll(const LoginScreen());
+        ? Get.offAll(() => const SignUpScreen())
+        : Get.offAll(const SignUpScreen());
   }
 
 
   ///-------------------- Email & Password Sign-In--------------------------------------
 
 
-  /// [EmailAuthentication] - SignIN
   /// [EmailAuthentication] - REGISTER
-  Future<UserCredential> registerWithEmailAndPassword(String email,
-      String password) async {
+  Future<UserCredential> registerWithEmailAndPassword({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+  }) async {
     try {
-      return await _auth.createUserWithEmailAndPassword(
-          email: email, password: password);
+      // Create user account
+      final cred = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Update display name
+      final user = cred.user ?? _auth.currentUser;
+      if (user != null) {
+        final fullName = '${firstName.trim()} ${lastName.trim()}'.trim();
+        if (fullName.isNotEmpty) {
+          await user.updateDisplayName(fullName);
+          await user.reload();
+        }
+
+        // Optionally store user info in Firestore
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': email,
+          'first_name': firstName,
+          'last_name': lastName,
+          'created_at': FieldValue.serverTimestamp(),
+        });
+      }
+
+      return cred;
     } on FirebaseAuthException catch (e) {
       throw TFirebaseAuthException(e.code).message;
     } on FirebaseException catch (e) {
       throw TFirebaseException(e.code).message;
-    } on FormatException catch (_) {
+    } on FormatException {
       throw const TFormatException();
     } on PlatformException catch (e) {
       throw TPlatformException(e.code).message;
-    } catch (e) {
+    } catch (_) {
       throw 'Something went wrong. Please try again';
     }
   }
 }
+
 
 
 

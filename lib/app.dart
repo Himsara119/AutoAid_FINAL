@@ -1,9 +1,9 @@
 import 'package:finalapp/bindings/general_bindings.dart';
+import 'package:finalapp/features/auth/screens/login_screen.dart';
 import 'package:finalapp/utils/constants/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 
-import 'features/auth/screens/login_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 
 class App extends StatelessWidget {
