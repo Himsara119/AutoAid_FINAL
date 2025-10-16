@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finalapp/features/auth/screens/forget_password_screen.dart';
 import 'package:finalapp/features/auth/screens/login_screen.dart';
 import 'package:finalapp/features/auth/screens/signup_screen.dart';
+import 'package:finalapp/features/auth/screens/success_password.dart';
 import 'package:finalapp/features/dashboard/screens/dashboard_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
@@ -35,8 +36,8 @@ class AuthenticationRepository extends GetxController {
 
     ///Check if it's the first time launching the app
     deviceStorage.read('IsFirstTime') != true
-        ? Get.offAll(() => const ForgetPasswordScreen())
-        : Get.offAll(const ForgetPasswordScreen());
+        ? Get.offAll(() => const CheckEmailScreen(email: ''))
+        : Get.offAll(const CheckEmailScreen(email: ''));
   }
 
 
