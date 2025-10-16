@@ -1,13 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:finalapp/features/ai/screens/ai_scan_screen.dart';
 import 'package:finalapp/features/auth/screens/forget_password_screen.dart';
 import 'package:finalapp/features/auth/screens/login_screen.dart';
 import 'package:finalapp/features/auth/screens/signup_screen.dart';
+import 'package:finalapp/features/auth/screens/success_password.dart';
 import 'package:finalapp/features/dashboard/screens/dashboard_screen.dart';
-import 'package:finalapp/features/documents/screens/doc_detail_screen.dart';
-import 'package:finalapp/features/reports/screens/report_builder_screen.dart';
+import 'package:finalapp/features/documents/screens/upload_doc_screen.dart';
+import 'package:finalapp/features/services/presentation/service_detail_screen.dart';
+import 'package:finalapp/features/vehicles/screens/add_vehicle_screen.dart';
+import 'package:finalapp/features/vehicles/screens/edit_vehicle_screen.dart';
+import 'package:finalapp/features/vehicles/screens/vehicles_list_screen.dart';
 import 'package:finalapp/features/vehicles/tabs/documents_tab.dart';
 import 'package:finalapp/features/vehicles/tabs/overview_tab.dart';
 import 'package:finalapp/features/vehicles/tabs/reports_tab.dart';
+import 'package:finalapp/features/vehicles/tabs/service_tab.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -40,8 +46,8 @@ class AuthenticationRepository extends GetxController {
 
     ///Check if it's the first time launching the app
     deviceStorage.read('IsFirstTime') != true
-        ? Get.offAll(() => const DocumentThesis())
-        : Get.offAll(const DocumentThesis());
+        ? Get.offAll(() => const UploadDocumentScreen())
+        : Get.offAll(const UploadDocumentScreen());
   }
 
 
