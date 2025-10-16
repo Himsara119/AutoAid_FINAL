@@ -1,4 +1,3 @@
-// lib/features/auth/ui/signup_screen.dart
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
