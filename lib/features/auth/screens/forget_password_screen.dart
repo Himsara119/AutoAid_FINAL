@@ -88,7 +88,7 @@ class ForgetPasswordScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              "No worries, we'll send you reset instructions\n"
+                              "we'll send you reset instructions\n"
                                   "to your email address.",
                               textAlign: TextAlign.center,
                               style: t.bodyMedium?.copyWith(color: const Color(0xFF6B7280), height: 1.35),
@@ -102,7 +102,7 @@ class ForgetPasswordScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   const Align(
-                                    alignment: Alignment.centerLeft,
+                                    alignment: Alignment.center,
                                     child: Text(
                                       'Email Address',
                                       style: TextStyle(
@@ -224,7 +224,7 @@ class _ForgetPasswordController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
 
-      await Future.delayed(const Duration(milliseconds: 400));
+      await Future.delayed(const Duration(milliseconds: 5000));
       Get.back(); // back to Login
     } on FirebaseAuthException catch (e) {
       Get.snackbar('Reset failed', e.message ?? 'Could not send reset email.');
@@ -241,3 +241,4 @@ class _ForgetPasswordController extends GetxController {
     super.onClose();
   }
 }
+

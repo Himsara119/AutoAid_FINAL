@@ -1,5 +1,11 @@
+import 'package:finalapp/features/dashboard/screens/dashboard_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:iconsax/iconsax.dart';
+
+import 'forget_password_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,7 +18,7 @@ class FinalApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const primary = Color(0xFF7C4DFF); // your purple
-    return MaterialApp(
+    return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'FinalApp',
       theme: ThemeData(
@@ -72,8 +78,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _onSignIn() {
     if (_formKey.currentState?.validate() ?? false) {
-      _snack('Signed in (demo)', bg: Colors.green.shade600);
-      // Normally navigate to your Dashboard screen here.
+      _snack('Sign in Successful', bg: Colors.green.shade600);
+      // Push dashboard (keeps back stack)
+      Get.to(() => const DashboardScreen());
       // Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DashboardDemo()));
     }
   }
@@ -154,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Text('Remember me'),
                     ]),
                     TextButton(
-                      onPressed: () => _snack('Forgot Password tapped', bg: Colors.amber.shade700),
+                      onPressed: () => Get.to(() => const ForgetPasswordScreen()),
                       child: const Text('Forgot Password?'),
                     ),
                   ],
@@ -164,14 +171,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 _PrimaryButton(text: 'Sign In', onPressed: _onSignIn),
 
                 const SizedBox(height: 16),
-                const _OrDivider(),
+                const Divider(),
                 const SizedBox(height: 16),
 
-                _OutlineButton(
-                  text: 'Continue with Google',
-                  onPressed: () => _snack('Google Sign-In tapped'),
-                  icon: const _GoogleG(),
-                ),
+                //_OutlineButton(
+                  //text: 'Continue with Google',
+                  //onPressed: () => _snack('Google Sign-In tapped'),
+                  //icon: const _GoogleG(),
+                //),
 
                 const SizedBox(height: 16),
                 Row(

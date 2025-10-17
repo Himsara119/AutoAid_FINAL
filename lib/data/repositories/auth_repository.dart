@@ -46,8 +46,8 @@ class AuthenticationRepository extends GetxController {
 
     ///Check if it's the first time launching the app
     deviceStorage.read('IsFirstTime') != true
-        ? Get.offAll(() => const NotificationsScreen())
-        : Get.offAll(const NotificationsScreen());
+        ? Get.offAll(() => const LoginScreen())
+        : Get.offAll(const LoginScreen());
   }
 
 
