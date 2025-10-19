@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class CheckEmailScreen extends StatelessWidget {
   const CheckEmailScreen({super.key, required this.email});
-
   final String email;
 
   @override
@@ -24,18 +23,19 @@ class CheckEmailScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // success chip
+                  // Green success badge
                   Container(
                     width: 64,
                     height: 64,
                     decoration: const BoxDecoration(
-                      color: Color(0xFFEFFAF3), // light green
+                      color: Color(0xFFEFFAF3),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Iconsax.tick_circle, color: Color(0xFF16A34A), size: 32),
                   ),
                   const SizedBox(height: 20),
 
+                  // Title
                   Text(
                     'Check Your Email',
                     style: t.titleLarge?.copyWith(
@@ -45,12 +45,12 @@ class CheckEmailScreen extends StatelessWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
+                  // Description (verification, not password reset)
                   Text(
-                    'Password reset email has been sent to\n'
-                        'your email address. Please check your inbox and follow\n'
-                        'the instructions.',
+                    'A verification email has been sent to your address.\n'
+                        'Please check your inbox and tap the link to verify.',
                     style: t.bodyMedium?.copyWith(
                       color: const Color(0xFF6B7280),
                       height: 1.35,
@@ -58,47 +58,53 @@ class CheckEmailScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
 
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 28),
 
+                  // Back to Login (primary)
                   SizedBox(
                     height: 48,
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () => Get.back(), // back to Login
+                      onPressed: () => Get.offAllNamed('/login'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C3AED), // purple
+                        backgroundColor: const Color(0xFF7C3AED),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         elevation: 0,
                       ),
-                      child: const Text(
-                        'Back to Login',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-                      ),
+                      child: const Text('Back to Login',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                     ),
                   ),
 
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
+                  /*// Resend Verification (secondary)
                   Obx(() => TextButton(
-                    onPressed: c.loading.value ? null : c.resendEmail,
+                    onPressed: (c.loading.value || c.cooldown.value > 0)
+                        ? null
+                        : c.resendVerificationEmail,
                     child: c.loading.value
                         ? const SizedBox(
-                        width: 18, height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text(
-                      'Resend Email',
-                      style: TextStyle(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                        : Text(
+                      c.cooldown.value > 0
+                          ? 'Resend in ${c.cooldown.value}s'
+                          : 'Resend Email',
+                      style: const TextStyle(
                         color: Color(0xFF111827),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                  )),
+                  )),*/
 
                   const SizedBox(height: 24),
 
+                  // Footer hint
                   Text(
-                    "Didn't receive the email? Check your spam\nfolder or try again.",
+                    "Didn't receive the email? Check your spam folder or try again.",
                     style: t.bodySmall?.copyWith(color: const Color(0xFF9CA3AF), height: 1.35),
                     textAlign: TextAlign.center,
                   ),
@@ -117,21 +123,42 @@ class _CheckEmailController extends GetxController {
   final String email;
 
   final loading = false.obs;
+  final cooldown = 0.obs;
 
-  Future<void> resendEmail() async {
+  /// Resends a **verification** email (not password reset).
+  /// Requires the user to still be signed in.
+  Future<void> resendVerificationEmail() async {
     try {
       loading.value = true;
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email.trim());
-      Get.snackbar('Email sent', 'Another password reset link was sent to $email.',
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        // If you sign out after signup, this will be null. Warn and send them to login.
+        Get.snackbar('Not signed in', 'Please login to resend the verification email.',
+            snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
+
+      await user.sendEmailVerification();
+      Get.snackbar('Sent', 'Another verification email was sent to $email.',
           snackPosition: SnackPosition.BOTTOM);
+
+      // Cooldown disables the button without showing the spinner
+      await _startCooldown(45);
     } on FirebaseAuthException catch (e) {
-      Get.snackbar('Resend failed', e.message ?? 'Could not resend the email.',
-          snackPosition: SnackPosition.BOTTOM);
-    } catch (_) {
-      Get.snackbar('Resend failed', 'Something went wrong. Please try again.',
+      Get.snackbar('Resend failed', e.message ?? 'Could not resend.',
           snackPosition: SnackPosition.BOTTOM);
     } finally {
+      // Spinner stops after the network call; button stays disabled by cooldown.
       loading.value = false;
+    }
+  }
+
+  Future<void> _startCooldown(int seconds) async {
+    cooldown.value = seconds;
+    while (cooldown.value > 0) {
+      await Future.delayed(const Duration(seconds: 1));
+      cooldown.value--;
     }
   }
 }

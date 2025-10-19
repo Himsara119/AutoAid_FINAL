@@ -1,3 +1,4 @@
+// user_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserModel {
@@ -19,41 +20,25 @@ class UserModel {
     required this.email,
     this.phone,
     this.photoUrl,
-    required this.role,
+    this.role = 'user',
     this.dealershipId,
-    required this.deleted,
-    required this.settings,
+    this.deleted = false,
+    Map<String, dynamic>? settings,
     this.createdAt,
     this.updatedAt,
-  });
-
-  factory UserModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
-    final x = d.data()!;
-    return UserModel(
-      id: d.id,
-      displayName: x['display_name'] ?? '',
-      email: x['email'] ?? '',
-      phone: x['phone'],
-      photoUrl: x['photo_url'],
-      role: x['role'] ?? 'user',
-      dealershipId: x['dealership_id'],
-      deleted: x['deleted'] ?? false,
-      settings: Map<String, dynamic>.from(x['settings'] ?? {}),
-      createdAt: x['created_at'],
-      updatedAt: x['updated_at'],
-    );
-  }
+  }) : settings = settings ?? {};
 
   Map<String, dynamic> toJson() => {
-    'Display_Name': displayName,
-    'Email': email,
-    'Phone': phone,
-    'Photo_Url': photoUrl,
-    'Role': role,
-    'Dealership_Id': dealershipId,
-    'Deleted': deleted,
-    'Settings': settings,
-    'Created_At': createdAt ?? FieldValue.serverTimestamp(),
-    'Updated_At': FieldValue.serverTimestamp(),
+    // CHANGED: keys in snake_case to be consistent
+    'display_name': displayName,
+    'email': email,
+    'phone': phone,
+    'photo_url': photoUrl,
+    'role': role,
+    'dealership_id': dealershipId,
+    'deleted': deleted,
+    'settings': settings,
+    'created_at': createdAt ?? FieldValue.serverTimestamp(),
+    'updated_at': FieldValue.serverTimestamp(),
   };
 }

@@ -1,15 +1,23 @@
+import 'package:finalapp/features/auth/screens/login_screen.dart'; // if unused, you can remove
+import 'package:finalapp/features/auth/screens/success_password.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../data/repositories/auth_repository.dart';
 
-class SignUpScreen extends StatelessWidget {
-  const SignUpScreen({super.key});
+class SignUpScreen extends StatefulWidget {
+  const SignUpScreen({Key? key}) : super(key: key);
+
+  @override
+  State<SignUpScreen> createState() => _SignUpScreenState();
+}
+
+class _SignUpScreenState extends State<SignUpScreen> {
+  final c = Get.put(SignUpController());
 
   @override
   Widget build(BuildContext context) {
-    final c = Get.put(SignUpController());
     final scheme = Theme.of(context).colorScheme;
 
     return Stack(
@@ -126,86 +134,87 @@ class SignUpScreen extends StatelessWidget {
                               const SizedBox(height: 12),
                               _LabeledField(
                                 label: 'Password',
-                                child: Obx(() => TextFormField(
-                                  controller: c.password,
-                                  obscureText: c.hidePass.value,
-                                  textInputAction: TextInputAction.next,
-                                  decoration: InputDecoration(
-                                    hintText: 'Create a password',
-                                    prefixIcon: const Icon(Icons.lock_outline),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                          c.hidePass.value ? Icons.visibility_off : Icons.visibility),
-                                      onPressed: c.togglePass,
+                                child: Obx(
+                                      () => TextFormField(
+                                    controller: c.password,
+                                    obscureText: c.hidePass.value,
+                                    textInputAction: TextInputAction.next,
+                                    decoration: InputDecoration(
+                                      hintText: 'Create a password',
+                                      prefixIcon: const Icon(Icons.lock_outline),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(c.hidePass.value ? Icons.visibility_off : Icons.visibility),
+                                        onPressed: c.togglePass,
+                                      ),
                                     ),
+                                    validator: (v) =>
+                                    (v == null || v.length < 6) ? 'Use at least 6 characters' : null,
                                   ),
-                                  validator: (v) =>
-                                  (v == null || v.length < 6) ? 'Use at least 6 characters' : null,
-                                )),
+                                ),
                               ),
                               const SizedBox(height: 12),
                               _LabeledField(
                                 label: 'Confirm Password',
-                                child: Obx(() => TextFormField(
-                                  controller: c.confirmPassword,
-                                  obscureText: c.hideConfirm.value,
-                                  textInputAction: TextInputAction.done,
-                                  decoration: InputDecoration(
-                                    hintText: 'Confirm your password',
-                                    prefixIcon: const Icon(Icons.lock_outline),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(c.hideConfirm.value
-                                          ? Icons.visibility_off
-                                          : Icons.visibility),
-                                      onPressed: c.toggleConfirm,
-                                    ),
-                                  ),
-                                  validator: (v) =>
-                                  v != c.password.text ? 'Passwords do not match' : null,
-                                )),
-                              ),
-                              const SizedBox(height: 8),
-                              Obx(() => Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Checkbox(
-                                    value: c.agree.value,
-                                    onChanged: (v) => c.agree.value = v ?? false,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: RichText(
-                                      text: TextSpan(
-                                        style: const TextStyle(
-                                            color: Color(0xFF4B5563), fontSize: 13),
-                                        children: [
-                                          const TextSpan(text: 'I agree to the '),
-                                          TextSpan(
-                                            text: 'Terms of Service',
-                                            style: const TextStyle(
-                                              color: Color(0xFF2563EB),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                            recognizer: TapGestureRecognizer()..onTap = c.openTerms,
-                                          ),
-                                          const TextSpan(text: ' and '),
-                                          TextSpan(
-                                            text: 'Privacy Policy',
-                                            style: const TextStyle(
-                                              color: Color(0xFF2563EB),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                            recognizer: TapGestureRecognizer()
-                                              ..onTap = c.openPrivacy,
-                                          ),
-                                        ],
+                                child: Obx(
+                                      () => TextFormField(
+                                    controller: c.confirmPassword,
+                                    obscureText: c.hideConfirm.value,
+                                    textInputAction: TextInputAction.done,
+                                    decoration: InputDecoration(
+                                      hintText: 'Confirm your password',
+                                      prefixIcon: const Icon(Icons.lock_outline),
+                                      suffixIcon: IconButton(
+                                        icon:
+                                        Icon(c.hideConfirm.value ? Icons.visibility_off : Icons.visibility),
+                                        onPressed: c.toggleConfirm,
                                       ),
                                     ),
+                                    validator: (v) => v != c.password.text ? 'Passwords do not match' : null,
                                   ),
-                                ],
-                              )),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Obx(
+                                    () => Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Checkbox(
+                                      value: c.agree.value,
+                                      onChanged: (v) => c.agree.value = v ?? false,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: RichText(
+                                        text: TextSpan(
+                                          style:
+                                          const TextStyle(color: Color(0xFF4B5563), fontSize: 13),
+                                          children: [
+                                            const TextSpan(text: 'I agree to the '),
+                                            TextSpan(
+                                              text: 'Terms of Service',
+                                              style: const TextStyle(
+                                                color: Color(0xFF2563EB),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              recognizer: TapGestureRecognizer()..onTap = c.openTerms,
+                                            ),
+                                            const TextSpan(text: ' and '),
+                                            TextSpan(
+                                              text: 'Privacy Policy',
+                                              style: const TextStyle(
+                                                  color: Color(0xFF2563EB),
+                                                  fontWeight: FontWeight.w600),
+                                              recognizer: TapGestureRecognizer()..onTap = c.openPrivacy,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                               const SizedBox(height: 8),
                               SizedBox(
                                 height: 50,
@@ -214,13 +223,15 @@ class SignUpScreen extends StatelessWidget {
                                     backgroundColor: scheme.primary,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14)),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
                                     elevation: 0,
                                   ),
                                   onPressed: c.submit,
-                                  child: const Text('Sign Up',
-                                      style:
-                                      TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                                  child: const Text(
+                                    'Sign Up',
+                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                                  ),
                                 ),
                               ),
                             ],
@@ -236,8 +247,7 @@ class SignUpScreen extends StatelessWidget {
                               style: TextStyle(color: Color(0xFF6B7280))),
                           TextButton(
                             onPressed: () {
-                              // Change this to your route name
-                              Get.toNamed('/login');
+                              Get.toNamed('/login'); // or your route
                             },
                             child: const Text('Login'),
                           ),
@@ -314,16 +324,27 @@ class SignUpController extends GetxController {
 
     try {
       Get.focusScope?.unfocus();
-      // If your repo uses a different method name, change this one line:
       await repo.registerWithEmailAndPassword(
         email: email.text.trim(),
         password: password.text,
         firstName: firstName.text.trim(),
         lastName: lastName.text.trim(),
       );
-      Get.snackbar('Success', 'Account created');
-      // Navigate to home or email verification
-      Get.offAllNamed('/home');
+
+      Get.snackbar(
+        'Check your inbox',
+        'A verification link was sent to ${email.text.trim()}',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+
+      // Go to Verify Email Screen (keep user signed in)
+      Get.offAll(
+            () => CheckEmailScreen(email: email.text.trim()),
+        transition: Transition.fadeIn,
+        duration: const Duration(milliseconds: 400),
+      );
+
+      //Get.snackbar('Success', 'Account created');
     } catch (e) {
       Get.snackbar('Signup failed', e.toString());
     }

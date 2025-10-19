@@ -1,107 +1,136 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:finalapp/features/ai/screens/ai_chat_screen.dart';
-import 'package:finalapp/features/auth/screens/forget_password_screen.dart';
-import 'package:finalapp/features/auth/screens/login_screen.dart';
-import 'package:finalapp/features/auth/screens/signup_screen.dart';
-import 'package:finalapp/features/dashboard/screens/dashboard_screen.dart';
-import 'package:finalapp/features/documents/screens/doc_detail_screen.dart';
-import 'package:finalapp/features/documents/screens/replace_doc_screen.dart';
-import 'package:finalapp/features/notifications/screens/notifications_screen.dart';
-import 'package:finalapp/features/reports/screens/report_builder_screen.dart';
-import 'package:finalapp/features/services/presentation/add_service_screen.dart';
-import 'package:finalapp/features/services/presentation/edit_service_screen.dart';
-import 'package:finalapp/features/vehicles/tabs/documents_tab.dart';
-import 'package:finalapp/features/vehicles/tabs/overview_tab.dart';
-import 'package:finalapp/features/vehicles/tabs/reports_tab.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 
-import '../../../utils/validators/exceptions.dart';
-import '../../features/documents/screens/upload_doc_screen.dart';
+/// Lightweight auth repository with email-verification flow.
+/// Keep this class free of UI logic. Throw meaningful errors.
+/// Controllers/UseCases decide how to show messages or navigate.
+class AuthenticationRepository {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-class AuthenticationRepository extends GetxController {
-  static AuthenticationRepository get instance => Get.find();
+  /// Stream current auth state (null when signed out)
+  Stream<User?> authStateChanges() => _auth.authStateChanges();
 
+  /// Returns the current user immediately (may be null)
+  User? get currentUser => _auth.currentUser;
 
-  ///Variables
-  final deviceStorage = GetStorage();
-  final _auth = FirebaseAuth.instance;
-
-  ///Called from main.dart on app launch
-  @override
-  void onReady() {
-    ///Remove the native splash screen
-    FlutterNativeSplash.remove();
-
-    ///Redirect to the appropriate screen
-    screenRedirect();
-  }
-
-  screenRedirect() async {
-    ///Local Storage
-    deviceStorage.writeIfNull('IsFirstTime', true);
-
-    ///Check if it's the first time launching the app
-    deviceStorage.read('IsFirstTime') != true
-        ? Get.offAll(() => const LoginScreen())
-        : Get.offAll(const LoginScreen());
-  }
-
-
-  ///-------------------- Email & Password Sign-In--------------------------------------
-
-
-  /// [EmailAuthentication] - REGISTER
-  Future<UserCredential> registerWithEmailAndPassword({
+  /// Sign up, set display name, send verification, then sign out.
+  /// Caller should route to a "Verify Email" screen.
+  Future<void> registerWithEmailAndPassword({
     required String email,
     required String password,
     required String firstName,
     required String lastName,
   }) async {
     try {
-      // Create user account
       final cred = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // Update display name
-      final user = cred.user ?? _auth.currentUser;
-      if (user != null) {
-        final fullName = '${firstName.trim()} ${lastName.trim()}'.trim();
-        if (fullName.isNotEmpty) {
-          await user.updateDisplayName(fullName);
-          await user.reload();
-        }
+      // Update profile
+      await cred.user?.updateDisplayName('$firstName $lastName');
 
-        // Optionally store user info in Firestore
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'email': email,
-          'first_name': firstName,
-          'last_name': lastName,
-          'created_at': FieldValue.serverTimestamp(),
-        });
+      // Send verification link
+      await cred.user?.sendEmailVerification();
+
+      // Force clean state so the user must log in AFTER verifying
+      await _auth.signOut();
+    } on FirebaseAuthException catch (e) {
+      throw _mapAuthError(e);
+    }
+  }
+
+  /// Login and enforce email verification.
+  /// If not verified, re-send verification (optional), sign out, and throw.
+  Future<void> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+    bool resendIfUnverified = true,
+  }) async {
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = cred.user;
+      if (user == null) {
+        await _auth.signOut();
+        throw AuthFailure(code: 'no-user', message: 'No user session established.');
       }
 
-      return cred;
+      // Always refresh before checking
+      await user.reload();
+      if (!(user.emailVerified)) {
+        if (resendIfUnverified) {
+          await user.sendEmailVerification();
+        }
+        await _auth.signOut();
+        throw AuthFailure(
+          code: 'email-not-verified',
+          message: 'Email not verified. We sent a new verification email.',
+        );
+      }
+
+      // Verified → allow entry
+      return;
     } on FirebaseAuthException catch (e) {
-      throw TFirebaseAuthException(e.code).message;
-    } on FirebaseException catch (e) {
-      throw TFirebaseException(e.code).message;
-    } on FormatException {
-      throw const TFormatException();
-    } on PlatformException catch (e) {
-      throw TPlatformException(e.code).message;
-    } catch (_) {
-      throw 'Something went wrong. Please try again';
+      throw _mapAuthError(e);
+    }
+  }
+
+  /// Try reloading and return the latest emailVerified state.
+  Future<bool> refreshAndCheckVerified() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    return user.emailVerified;
+  }
+
+  /// Resend verification email to the current user.
+  Future<void> resendVerificationEmail() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw AuthFailure(code: 'not-signed-in', message: 'No signed-in user to verify.');
+    }
+    await user.sendEmailVerification();
+  }
+
+  Future<void> signOut() => _auth.signOut();
+
+  // ------------ Error mapping ------------
+
+  AuthFailure _mapAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return AuthFailure(code: e.code, message: 'The email address is invalid.');
+      case 'user-disabled':
+        return AuthFailure(code: e.code, message: 'This account has been disabled.');
+      case 'user-not-found':
+        return AuthFailure(code: e.code, message: 'No account found for this email.');
+      case 'wrong-password':
+        return AuthFailure(code: e.code, message: 'Incorrect password.');
+      case 'email-already-in-use':
+        return AuthFailure(code: e.code, message: 'An account already exists for this email.');
+      case 'weak-password':
+        return AuthFailure(code: e.code, message: 'Password is too weak.');
+      case 'too-many-requests':
+        return AuthFailure(code: e.code, message: 'Too many attempts. Try again later.');
+      default:
+        return AuthFailure(
+          code: e.code.isEmpty ? 'auth-error' : e.code,
+          message: e.message ?? 'Authentication failed.',
+        );
     }
   }
 }
 
+/// Simple failure object you can pattern-match on in controllers.
+/// Keep it lean; show the message in a snackbar/dialog.
+class AuthFailure implements Exception {
+  final String code;
+  final String message;
+  AuthFailure({required this.code, required this.message});
 
-
-
+  @override
+  String toString() => '$code: $message';
+}

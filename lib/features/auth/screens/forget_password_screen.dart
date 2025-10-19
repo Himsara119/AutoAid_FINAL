@@ -1,4 +1,5 @@
 // lib/features/auth/ui/forget_password_screen.dart
+import 'package:finalapp/features/auth/screens/success_password.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -91,7 +92,10 @@ class ForgetPasswordScreen extends StatelessWidget {
                               "we'll send you reset instructions\n"
                                   "to your email address.",
                               textAlign: TextAlign.center,
-                              style: t.bodyMedium?.copyWith(color: const Color(0xFF6B7280), height: 1.35),
+                              style: t.bodyMedium?.copyWith(
+                                color: const Color(0xFF6B7280),
+                                height: 1.35,
+                              ),
                             ),
                             const SizedBox(height: 18),
 
@@ -124,8 +128,10 @@ class ForgetPasswordScreen extends StatelessWidget {
                                         padding: EdgeInsets.only(right: 8),
                                         child: Icon(Iconsax.sms, size: 20),
                                       ),
-                                      suffixIconConstraints:
-                                      const BoxConstraints(minHeight: 20, minWidth: 20),
+                                      suffixIconConstraints: const BoxConstraints(
+                                        minHeight: 20,
+                                        minWidth: 20,
+                                      ),
                                       filled: true,
                                       fillColor: Colors.white,
                                       contentPadding: const EdgeInsets.symmetric(
@@ -142,8 +148,10 @@ class ForgetPasswordScreen extends StatelessWidget {
                                       ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
-                                        borderSide:
-                                        BorderSide(color: scheme.primary, width: 1.6),
+                                        borderSide: BorderSide(
+                                          color: scheme.primary,
+                                          width: 1.6,
+                                        ),
                                       ),
                                     ),
                                     validator: (v) {
@@ -155,6 +163,7 @@ class ForgetPasswordScreen extends StatelessWidget {
                                     },
                                   ),
                                   const SizedBox(height: 16),
+
                                   Obx(
                                         () => SizedBox(
                                       height: 48,
@@ -215,21 +224,31 @@ class _ForgetPasswordController extends GetxController {
 
     try {
       loading.value = true;
-      await FirebaseAuth.instance
-          .sendPasswordResetEmail(email: email.text.trim());
+      Get.focusScope?.unfocus();
 
-      Get.snackbar(
-        'Email sent',
-        'Check your inbox for the reset link.',
-        snackPosition: SnackPosition.BOTTOM,
+      // Send the reset email
+      final addr = email.text.trim();
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: addr);
+
+      // Navigate to the "Check Email" confirmation screen
+      Get.to(
+            () => CheckEmailScreen(email: addr),
+        transition: Transition.fadeIn,
+        duration: const Duration(milliseconds: 350),
       );
 
-      await Future.delayed(const Duration(milliseconds: 5000));
-      Get.back(); // back to Login
+      // Optional: confirm
+      Get.snackbar(
+        'Email sent',
+        'Password reset link sent to $addr',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     } on FirebaseAuthException catch (e) {
-      Get.snackbar('Reset failed', e.message ?? 'Could not send reset email.');
+      Get.snackbar('Reset failed', e.message ?? 'Could not send reset email.',
+          snackPosition: SnackPosition.BOTTOM);
     } catch (_) {
-      Get.snackbar('Reset failed', 'Something went wrong. Try again.');
+      Get.snackbar('Reset failed', 'Something went wrong. Try again.',
+          snackPosition: SnackPosition.BOTTOM);
     } finally {
       loading.value = false;
     }
@@ -241,4 +260,3 @@ class _ForgetPasswordController extends GetxController {
     super.onClose();
   }
 }
-
