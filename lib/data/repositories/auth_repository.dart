@@ -1,19 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 
-/// Lightweight auth repository with email-verification flow.
-/// Keep this class free of UI logic. Throw meaningful errors.
-/// Controllers/UseCases decide how to show messages or navigate.
 class AuthenticationRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   /// Stream current auth state (null when signed out)
   Stream<User?> authStateChanges() => _auth.authStateChanges();
-
-  /// Returns the current user immediately (may be null)
   User? get currentUser => _auth.currentUser;
 
-  /// Sign up, set display name, send verification, then sign out.
-  /// Caller should route to a "Verify Email" screen.
   Future<void> registerWithEmailAndPassword({
     required String email,
     required String password,
@@ -28,10 +21,8 @@ class AuthenticationRepository {
 
       // Update profile
       await cred.user?.updateDisplayName('$firstName $lastName');
-
       // Send verification link
       await cred.user?.sendEmailVerification();
-
       // Force clean state so the user must log in AFTER verifying
       await _auth.signOut();
     } on FirebaseAuthException catch (e) {
@@ -40,7 +31,6 @@ class AuthenticationRepository {
   }
 
   /// Login and enforce email verification.
-  /// If not verified, re-send verification (optional), sign out, and throw.
   Future<void> signInWithEmailAndPassword({
     required String email,
     required String password,
@@ -51,7 +41,6 @@ class AuthenticationRepository {
         email: email,
         password: password,
       );
-
       final user = cred.user;
       if (user == null) {
         await _auth.signOut();
@@ -71,7 +60,7 @@ class AuthenticationRepository {
         );
       }
 
-      // Verified → allow entry
+      // Verified allow entry
       return;
     } on FirebaseAuthException catch (e) {
       throw _mapAuthError(e);
@@ -124,8 +113,6 @@ class AuthenticationRepository {
   }
 }
 
-/// Simple failure object you can pattern-match on in controllers.
-/// Keep it lean; show the message in a snackbar/dialog.
 class AuthFailure implements Exception {
   final String code;
   final String message;
