@@ -1,18 +1,26 @@
-import 'package:flutter/cupertino.dart';
+// lib/app.dart
+import 'package:finalapp/features/ai/screens/ai_chat_screen.dart';
+import 'package:finalapp/features/vehicles/screens/vehicles_list_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get_navigation/src/root/get_material_app.dart';
-import 'package:get/get_navigation/src/routes/get_route.dart';
-import 'package:get/get_navigation/src/routes/transitions_type.dart';
+import 'package:get/get.dart';
 
 import 'bindings/general_bindings.dart';
-import 'features/ai/screens/ai_scan_screen.dart';
+
+// Auth + shell
 import 'features/auth/screens/login_screen.dart';
-import 'features/dashboard/screens/dashboard_screen.dart';
-import 'features/mechanics/screens/mechanic_map_screen.dart';
-import 'features/profile/screens/profile_view_screen.dart';
-import 'features/reports/screens/report_builder_screen.dart';
 import 'features/shell/app_shell.dart';
-import 'features/vehicles/screens/add_vehicle_screen.dart';
+
+// Home tab content
+import 'features/dashboard/screens/dashboard_screen.dart';
+
+// Profile tab content
+import 'features/profile/screens/profile_view_screen.dart';
+
+// Quick actions / other flows
+import 'features/ai/screens/ai_scan_screen.dart';                  // VisualScanScreen
+import 'features/vehicles/screens/add_vehicle_screen.dart';       // AddVehicleScreen
+import 'features/reports/screens/report_builder_screen.dart';     // ReportBuilderScreen
+import 'features/mechanics/screens/mechanic_map_screen.dart';     // MechanicMapScreen
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -27,24 +35,26 @@ class App extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Poppins',
       ),
-
       // Start at login. After success, navigate to `/app`.
-      initialRoute: '/login',
+      initialRoute: '/dashboard',
 
-      // Global animation setup
-      defaultTransition: Transition.fadeIn,
-      transitionDuration: const Duration(milliseconds: 300),
-
-      // Pages
+      // IMPORTANT: do NOT make this list const
       getPages: [
         GetPage(name: '/login', page: () => const LoginScreen()),
+
+        // The shell owns the bottom nav and switches tabs internally.
         GetPage(name: '/app', page: () => const AppShell()),
+
+        // If you ever deep-link directly into a tab’s screen, keep these:
         GetPage(name: '/dashboard', page: () => const DashboardScreen()),
         GetPage(name: '/profile', page: () => const ProfileScreen()),
+
+        // Quick actions / extra routes
         GetPage(name: '/visual-scan', page: () => const VisualScanScreen()),
-        GetPage(name: '/add-vehicle', page: () => const AddVehicleScreen()),
+        GetPage(name: '/add-vehicle', page: () => const VehiclesScreen()),
         GetPage(name: '/report-builder', page: () => const ReportBuilderScreen()),
         GetPage(name: '/mechanic-finder', page: () => const FindMechanicScreen()),
+        GetPage(name: '/aiscreen', page: () => const AiDiagnosisChatScreen()),
       ],
     );
   }
