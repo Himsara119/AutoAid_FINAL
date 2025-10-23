@@ -8,8 +8,11 @@ import '../../../data/repositories/dashboard_repository.dart';
 class DashboardController extends GetxController {
   DashboardController(this._repo);
 
-  // Use the interface type defined in your repository file.
   final DashboardRepository _repo;
+
+  // UI/nav state for bottom NavigationBar
+  final RxInt index = 0.obs;
+  void setIndex(int i) => index.value = i;
 
   // State
   final greetingName = 'Alex'.obs;
@@ -35,11 +38,9 @@ class DashboardController extends GetxController {
     }
   }
 
-  // Quick actions (wire navigation later)
-// DashboardController
+  // Quick actions
   Future<void> addVehicle() async => Get.toNamed('/add-vehicle');
   Future<void> visualScan() async => Get.toNamed('/visual-scan');
   Future<void> generateReport() async => Get.toNamed('/report-builder');
   Future<void> findMechanic() async => Get.toNamed('/mechanic-finder');
-
 }

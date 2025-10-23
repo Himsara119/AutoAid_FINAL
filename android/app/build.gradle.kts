@@ -55,5 +55,14 @@ dependencies {
     // TODO: Add the dependencies for Firebase products you want to use
     // When using the BoM, don't specify versions in Firebase dependencies
     // https://firebase.google.com/docs/android/setup#available-libraries
+
+    // Pick only what you actually use — these are the ones your logs say you’re touching
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-messaging")
+
+    // Base Play Services to satisfy the broker/phenotype/provider bits on real devices
+    implementation("com.google.android.gms:play-services-base:18.5.0")
 }
 

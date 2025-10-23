@@ -1,7 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/cupertino.dart';
 
 class AuthenticationRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  AuthenticationRepository() {
+    debugPrint('AuthRepository created. Current user: ${_auth.currentUser?.email ?? "none"}');
+  }
 
   /// Stream current auth state (null when signed out)
   Stream<User?> authStateChanges() => _auth.authStateChanges();

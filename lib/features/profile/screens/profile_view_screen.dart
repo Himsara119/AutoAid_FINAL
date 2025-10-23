@@ -20,7 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      bottomNavigationBar: _BottomNav(currentIndex: 1, onTap: (_) {}),
+      //bottomNavigationBar: _BottomNav(currentIndex: 1, onTap: (_) {}),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -388,7 +388,7 @@ class _SwitchTile extends StatelessWidget {
   }
 }
 
-class _BottomNav extends StatelessWidget {
+/*class _BottomNav extends StatelessWidget {
   const _BottomNav({required this.currentIndex, required this.onTap});
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -408,7 +408,7 @@ class _BottomNav extends StatelessWidget {
       ],
     );
   }
-}
+}*/
 
 /* ----------------------------- helpers ----------------------------- */
 

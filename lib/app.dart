@@ -1,26 +1,26 @@
 // lib/app.dart
-import 'package:finalapp/features/ai/screens/ai_chat_screen.dart';
-import 'package:finalapp/features/vehicles/screens/vehicles_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+// Global bindings
 import 'bindings/general_bindings.dart';
 
 // Auth + shell
 import 'features/auth/screens/login_screen.dart';
 import 'features/shell/app_shell.dart';
 
-// Home tab content
-import 'features/dashboard/screens/dashboard_screen.dart';
-
-// Profile tab content
+// Core feature screens
 import 'features/profile/screens/profile_view_screen.dart';
+import 'features/vehicles/screens/vehicles_list_screen.dart';
 
 // Quick actions / other flows
-import 'features/ai/screens/ai_scan_screen.dart';                  // VisualScanScreen
-import 'features/vehicles/screens/add_vehicle_screen.dart';       // AddVehicleScreen
-import 'features/reports/screens/report_builder_screen.dart';     // ReportBuilderScreen
-import 'features/mechanics/screens/mechanic_map_screen.dart';     // MechanicMapScreen
+import 'features/ai/screens/ai_chat_screen.dart';            // AI Assistant
+import 'features/ai/screens/ai_scan_screen.dart';            // Visual Scan
+import 'features/vehicles/screens/add_vehicle_screen.dart';  // Add Vehicle
+import 'features/reports/screens/report_builder_screen.dart'; // Report Builder
+import 'features/mechanics/screens/mechanic_map_screen.dart'; // Find Mechanic
+
+/* ------------------------------- MAIN APP ------------------------------- */
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -31,31 +31,105 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       initialBinding: GeneralBindings(),
       title: 'FinalApp',
+
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Poppins',
+        scaffoldBackgroundColor: const Color(0xFFF7F8FA),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.blue,
+          primary: AppColors.blue,
+          surface: Colors.white,
+        ),
+        textTheme: const TextTheme(
+          headlineMedium: TextStyle(fontWeight: FontWeight.w700, fontSize: 26),
+          titleLarge: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
+          titleMedium: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+          bodyMedium: TextStyle(fontWeight: FontWeight.w400, fontSize: 14, height: 1.4),
+          labelLarge: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
       ),
-      // Start at login. After success, navigate to `/app`.
-      initialRoute: '/dashboard',
 
-      // IMPORTANT: do NOT make this list const
-      getPages: [
-        GetPage(name: '/login', page: () => const LoginScreen()),
+      // Load shell with bottom navigation as the entry point
+      initialRoute: Routes.app,
 
-        // The shell owns the bottom nav and switches tabs internally.
-        GetPage(name: '/app', page: () => const AppShell()),
-
-        // If you ever deep-link directly into a tab’s screen, keep these:
-        GetPage(name: '/dashboard', page: () => const DashboardScreen()),
-        GetPage(name: '/profile', page: () => const ProfileScreen()),
-
-        // Quick actions / extra routes
-        GetPage(name: '/visual-scan', page: () => const VisualScanScreen()),
-        GetPage(name: '/add-vehicle', page: () => const VehiclesScreen()),
-        GetPage(name: '/report-builder', page: () => const ReportBuilderScreen()),
-        GetPage(name: '/mechanic-finder', page: () => const FindMechanicScreen()),
-        GetPage(name: '/aiscreen', page: () => const AiDiagnosisChatScreen()),
-      ],
+      getPages: AppPages.pages,
     );
   }
+}
+
+/* ------------------------------- ROUTES -------------------------------- */
+
+class Routes {
+  static const login = '/login';
+  static const app = '/app';
+  static const profile = '/profile';
+  static const addVehicle = '/add-vehicle';
+  static const visualScan = '/visual-scan';
+  static const reportBuilder = '/report-builder';
+  static const mechanicFinder = '/mechanic-finder';
+  static const aiScreen = '/aiscreen';
+}
+
+class AppPages {
+  static final pages = <GetPage>[
+    GetPage(
+      name: Routes.login,
+      page: () => const LoginScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.app,
+      page: () => const AppShell(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.profile,
+      page: () => const ProfileScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.addVehicle,
+      page: () => const VehiclesScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.visualScan,
+      page: () => const VisualScanScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.reportBuilder,
+      page: () => const ReportBuilderScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.mechanicFinder,
+      page: () => const FindMechanicScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.aiScreen,
+      page: () => const AiDiagnosisChatScreen(),
+      transition: Transition.cupertino,
+    ),
+  ];
+}
+
+/* ------------------------------- COLORS -------------------------------- */
+
+class AppColors {
+  static const blue = Color(0xFF2563EB);
+  static const blueLight = Color(0xFFEFF4FF);
+  static const tileBg = Color(0xFFFFFFFF);
+  static const border = Color(0xFFE6E8ED);
+  static const success = Color(0xFF16A34A);
+  static const successBg = Color(0xFFEFFAF3);
+  static const warning = Color(0xFFF59E0B);
+  static const warningBg = Color(0xFFFFF7E8);
+  static const danger = Color(0xFFEF4444);
+  static const dangerBg = Color(0xFFFFEEEE);
+  static const info = Color(0xFF2563EB);
+  static const infoBg = Color(0xFFEFF4FF);
+  static const muted = Color(0xFF6B7280);
 }

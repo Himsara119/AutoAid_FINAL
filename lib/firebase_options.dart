@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -28,15 +25,9 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -54,6 +45,7 @@ class DefaultFirebaseOptions {
     appId: '1:658908988315:android:fe65a555b03cc3cc6b973e',
     messagingSenderId: '658908988315',
     projectId: 'autoaid-dev',
+    databaseURL: 'https://autoaid-dev-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'autoaid-dev.firebasestorage.app',
   );
 
@@ -62,7 +54,39 @@ class DefaultFirebaseOptions {
     appId: '1:658908988315:ios:046ff129720c63716b973e',
     messagingSenderId: '658908988315',
     projectId: 'autoaid-dev',
+    databaseURL: 'https://autoaid-dev-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'autoaid-dev.firebasestorage.app',
     iosBundleId: 'com.example.autoaidFinalProject',
   );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyD8ROhZjn0Wb5NMkFTnZQslfXBMqBn8luw',
+    appId: '1:658908988315:web:d2873298c2aa3b576b973e',
+    messagingSenderId: '658908988315',
+    projectId: 'autoaid-dev',
+    authDomain: 'autoaid-dev.firebaseapp.com',
+    databaseURL: 'https://autoaid-dev-default-rtdb.asia-southeast1.firebasedatabase.app',
+    storageBucket: 'autoaid-dev.firebasestorage.app',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyDD0Hem0imSC0-wmG75IHAmeETv9exBpuU',
+    appId: '1:658908988315:ios:046ff129720c63716b973e',
+    messagingSenderId: '658908988315',
+    projectId: 'autoaid-dev',
+    databaseURL: 'https://autoaid-dev-default-rtdb.asia-southeast1.firebasedatabase.app',
+    storageBucket: 'autoaid-dev.firebasestorage.app',
+    iosBundleId: 'com.example.autoaidFinalProject',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyD8ROhZjn0Wb5NMkFTnZQslfXBMqBn8luw',
+    appId: '1:658908988315:web:a8ee9b2a3bfcfdc46b973e',
+    messagingSenderId: '658908988315',
+    projectId: 'autoaid-dev',
+    authDomain: 'autoaid-dev.firebaseapp.com',
+    databaseURL: 'https://autoaid-dev-default-rtdb.asia-southeast1.firebasedatabase.app',
+    storageBucket: 'autoaid-dev.firebasestorage.app',
+  );
+
 }

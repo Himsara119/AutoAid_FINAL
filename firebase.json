@@ -13,7 +13,10 @@
           "projectId": "autoaid-dev",
           "configurations": {
             "android": "1:658908988315:android:fe65a555b03cc3cc6b973e",
-            "ios": "1:658908988315:ios:046ff129720c63716b973e"
+            "ios": "1:658908988315:ios:046ff129720c63716b973e",
+            "macos": "1:658908988315:ios:046ff129720c63716b973e",
+            "web": "1:658908988315:web:d2873298c2aa3b576b973e",
+            "windows": "1:658908988315:web:a8ee9b2a3bfcfdc46b973e"
           }
         }
       }
