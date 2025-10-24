@@ -1,11 +1,15 @@
 import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:iconsax/iconsax.dart';
 
 // Firebase
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../../app.dart';
 
 // If you generated options, prefer:
 // import 'firebase_options.dart';
@@ -163,8 +167,8 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                 children: [
                   IconButton(
                     onPressed: () {
-                      _d('Back pressed');
-                      Navigator.of(context).maybePop();
+                      _d('Back pressed → go to Dashboard');
+                      Get.offAllNamed('/app');
                     },
                     icon: const Icon(Iconsax.arrow_left_2),
                   ),
@@ -290,14 +294,12 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                             message:
                             'Add your first vehicle to start tracking maintenance, service records, and more.',
                             buttonText: 'Add Vehicle',
-                            onPressed: () {
+                            onPressed: () async {
                               _d('CTA Add Vehicle from empty state');
-                              // TODO: navigate to your AddVehicle screen
-                              // Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddVehicleScreen()));
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Navigate to Add Vehicle')),
-                              );
+                              final result = await Get.toNamed(
+                                  Routes.vehicleadd,
+                                  parameters: {'source': 'vehicles_list'},    // optional
+                                  preventDuplicates: true);
                             },
                           ),
                         ),
