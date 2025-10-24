@@ -1,7 +1,31 @@
+import 'dart:developer' as dev;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
-void main() => runApp(const VehiclesApp());
+// Firebase
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+// If you generated options, prefer:
+// import 'firebase_options.dart';
+
+void _d(String msg, {Object? err, StackTrace? st, String tag = 'Vehicles'}) {
+  if (kDebugMode) dev.log(msg, name: tag, error: err, stackTrace: st);
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await Firebase.initializeApp();
+    _d('Firebase.initializeApp() ✓');
+  } catch (e, st) {
+    _d('Firebase init failed: $e', err: e, st: st);
+    rethrow;
+  }
+  runApp(const VehiclesApp());
+}
 
 class VehiclesApp extends StatelessWidget {
   const VehiclesApp({super.key});
@@ -15,7 +39,7 @@ class VehiclesApp extends StatelessWidget {
       title: 'Vehicles',
       theme: ThemeData(
         useMaterial3: true,
-        fontFamily: 'Poppins', // assumes you added Poppins in pubspec
+        fontFamily: 'Poppins',
         scaffoldBackgroundColor: Colors.white,
         colorScheme: ColorScheme.fromSeed(
           seedColor: purple,
@@ -53,8 +77,60 @@ class VehiclesScreen extends StatefulWidget {
 }
 
 class _VehiclesScreenState extends State<VehiclesScreen> {
-  int _tabIndex = 1; // Profile selected as in mock
+  int _tabIndex = 1; // keep your mock vibe
   String _filter = 'All';
+  final _searchCtrl = TextEditingController();
+
+  // used to force rebuild of Stream when you press Refresh
+  int _reloadKey = 0;
+
+  Query<Map<String, dynamic>> _buildQuery() {
+    final db = FirebaseFirestore.instance;
+    Query<Map<String, dynamic>> q =
+    db.collection('vehicles').where('deleted', isEqualTo: false);
+
+    switch (_filter) {
+      case 'Active':
+        q = q.where('status', isEqualTo: 'active');
+        break;
+      case 'Pending':
+        q = q.where('status', isEqualTo: 'pending');
+        break;
+      default:
+      // All
+        break;
+    }
+    // deterministic order
+    q = q.orderBy('created_at', descending: true);
+    _d('Query built | filter=$_filter');
+    return q;
+  }
+
+  Future<void> _refresh() async {
+    _d('Manual refresh requested');
+    // The stream is realtime anyway, but this forces a rebuild
+    setState(() => _reloadKey++);
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Refreshed')),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl.addListener(() {
+      _d('search="${_searchCtrl.text}"');
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,9 +138,12 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     final c = Theme.of(context).colorScheme;
 
     return Scaffold(
-      bottomNavigationBar: BottomNavigationBar(
+      /*bottomNavigationBar: BottomNavigationBar(
         currentIndex: _tabIndex,
-        onTap: (i) => setState(() => _tabIndex = i),
+        onTap: (i) {
+          _d('BottomNav tapped index=$i');
+          setState(() => _tabIndex = i);
+        },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: c.primary,
         unselectedItemColor: const Color(0xFF98A2B3),
@@ -73,7 +152,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
           BottomNavigationBarItem(icon: Icon(Iconsax.home_1), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Iconsax.user), label: 'Profile'),
         ],
-      ),
+      ),*/
       body: SafeArea(
         child: Column(
           children: [
@@ -83,14 +162,17 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      _d('Back pressed');
+                      Navigator.of(context).maybePop();
+                    },
                     icon: const Icon(Iconsax.arrow_left_2),
                   ),
                   Container(
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                      color: c.primary.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(Iconsax.car, color: c.primary),
@@ -104,17 +186,30 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                       )),
                   const Spacer(),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      _d('Notifications tap (noop)');
+                    },
                     icon: const Icon(Iconsax.notification),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh',
+                    onPressed: _refresh,
+                    icon: const Icon(Iconsax.refresh),
                   ),
                 ],
               ),
             ),
 
             // Search
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
-              child: _SearchField(hintText: 'Search vehicles...'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: TextField(
+                controller: _searchCtrl,
+                decoration: const InputDecoration(
+                  hintText: 'Search vehicles...',
+                  prefixIcon: Icon(Iconsax.search_normal_1),
+                ),
+              ),
             ),
 
             // Filters + funnel
@@ -142,58 +237,157 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                   const Spacer(),
                   _IconPill(
                     icon: Iconsax.filter,
-                    onTap: () {},
+                    onTap: () => _d('Filter funnel tap'),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
 
-            // Empty state
+            // List / Empty + pull-to-refresh
             Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _EmptyState(
-                    icon: Iconsax.car,
-                    title: 'No vehicles added yet',
-                    message:
-                    'Add your first vehicle to start tracking maintenance, service records, and more.',
-                    buttonText: 'Add Vehicle',
-                    onPressed: () {
-                      // Hook to your Add Vehicle flow
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Add Vehicle tapped')),
+              child: RefreshIndicator(
+                onRefresh: _refresh,
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  key: ValueKey(_reloadKey), // so pressing Refresh rebuilds
+                  stream: _buildQuery().snapshots(),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snap.hasError) {
+                      _d('Stream error: ${snap.error}');
+                      return Center(child: Text('Error: ${snap.error}'));
+                    }
+
+                    final docs = snap.data?.docs ?? [];
+                    final q = _searchCtrl.text.trim().toLowerCase();
+                    final filtered = q.isEmpty
+                        ? docs
+                        : docs.where((d) {
+                      final m = d.data();
+                      final text = [
+                        m['make'] ?? '',
+                        m['model'] ?? '',
+                        m['vin'] ?? '',
+                        m['trim'] ?? '',
+                        m['fuel_type'] ?? '',
+                      ].join(' ').toLowerCase();
+                      return text.contains(q);
+                    }).toList();
+
+                    _d('Render list | total=${docs.length} filtered=${filtered.length}');
+
+                    if (filtered.isEmpty) {
+                      return SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: _EmptyState(
+                            icon: Iconsax.car,
+                            title: 'No vehicles added yet',
+                            message:
+                            'Add your first vehicle to start tracking maintenance, service records, and more.',
+                            buttonText: 'Add Vehicle',
+                            onPressed: () {
+                              _d('CTA Add Vehicle from empty state');
+                              // TODO: navigate to your AddVehicle screen
+                              // Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddVehicleScreen()));
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Navigate to Add Vehicle')),
+                              );
+                            },
+                          ),
+                        ),
                       );
-                    },
-                  ),
+                    }
+
+                    return ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (_, i) {
+                        final v = filtered[i].data();
+                        final title =
+                        '${v['make'] ?? ''} ${v['model'] ?? ''}'.trim();
+                        final year = '${v['year'] ?? ''}';
+                        final type = _prettyFuel(v['fuel_type']);
+                        final vin = v['vin']?.toString() ?? '';
+                        final status = _prettyStatus(v['status']);
+                        return _VehicleCard(
+                          title: title,
+                          year: year,
+                          type: type,
+                          vin: vin,
+                          status: status,
+                          onTap: () => _d('Vehicle tap vin=$vin'),
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
             ),
+
+            // Big “Add Vehicle” button like your mock
+            /*SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton(
+                    onPressed: () {
+                      _d('CTA Add Vehicle from footer');
+                      // TODO: navigate to your AddVehicle screen
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Navigate to Add Vehicle')),
+                      );
+                    },
+                    child: const Text('Add Vehicle'),
+                  ),
+                ),
+              ),
+            ),*/
           ],
         ),
       ),
     );
   }
+
+  static String _prettyFuel(dynamic f) {
+    final s = (f?.toString() ?? '').toLowerCase();
+    switch (s) {
+      case 'electric':
+        return 'Electric';
+      case 'hybrid':
+        return 'Hybrid';
+      case 'diesel':
+        return 'Diesel';
+      default:
+        return 'Petrol';
+    }
+  }
+
+  static String _prettyStatus(dynamic s) {
+    final v = (s?.toString() ?? '').toLowerCase();
+    switch (v) {
+      case 'pending':
+        return 'Pending';
+      case 'sold':
+        return 'Sold';
+      case 'archived':
+        return 'Archived';
+      default:
+        return 'Complete';
+    }
+  }
 }
 
 /* ============================== MINI WIDGETS ============================== */
-
-class _SearchField extends StatelessWidget {
-  const _SearchField({required this.hintText});
-  final String hintText;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      decoration: InputDecoration(
-        hintText: hintText,
-        prefixIcon: const Icon(Iconsax.search_normal_1),
-      ),
-    );
-  }
-}
 
 class _FilterChipPill extends StatelessWidget {
   const _FilterChipPill({
@@ -211,7 +405,10 @@ class _FilterChipPill extends StatelessWidget {
     final c = Theme.of(context).colorScheme;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        _d('Filter change → $label');
+        onTap();
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
@@ -323,6 +520,110 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 26),
       ],
+    );
+  }
+}
+
+class _VehicleCard extends StatelessWidget {
+  const _VehicleCard({
+    required this.title,
+    required this.year,
+    required this.type,
+    required this.vin,
+    required this.status,
+    this.onTap,
+  });
+
+  final String title;
+  final String year;
+  final String type;
+  final String vin;
+  final String status;
+  final VoidCallback? onTap;
+
+  Color _badgeBg() {
+    switch (status) {
+      case 'Pending':
+        return const Color(0xFFFFF7E8);
+      case 'Complete':
+        return const Color(0xFFEFFAF3);
+      default:
+        return const Color(0xFFEFF4FF);
+    }
+  }
+
+  Color _badgeFg() {
+    switch (status) {
+      case 'Pending':
+        return const Color(0xFFF59E0B);
+      case 'Complete':
+        return const Color(0xFF16A34A);
+      default:
+        return const Color(0xFF2563EB);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    return InkWell(
+      onTap: onTap,
+      child: Ink(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.directions_car_filled_outlined),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: t.titleLarge?.copyWith(color: const Color(0xFF0F172A))),
+                  const SizedBox(height: 4),
+                  Text(year, style: t.bodyMedium?.copyWith(color: const Color(0xFF6B7280))),
+                  Text(type, style: t.bodyMedium?.copyWith(color: const Color(0xFF6B7280))),
+                  Text('VIN:$vin', style: t.bodyMedium?.copyWith(color: const Color(0xFF6B7280))),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _badgeBg(),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(status, style: t.labelLarge?.copyWith(color: _badgeFg())),
+                ),
+                const SizedBox(height: 18),
+                Icon(Icons.chevron_right, color: Colors.black.withOpacity(0.5)),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

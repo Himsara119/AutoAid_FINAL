@@ -1,4 +1,7 @@
 // lib/app.dart
+import 'package:finalapp/features/profile/screens/about_screen.dart';
+import 'package:finalapp/features/profile/screens/help_screen.dart';
+import 'package:finalapp/features/profile/screens/profile_edit_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -32,6 +35,9 @@ class App extends StatelessWidget {
       initialBinding: GeneralBindings(),
       title: 'FinalApp',
 
+      defaultTransition: Transition.cupertino, // choose any style you want
+      transitionDuration: const Duration(milliseconds: 400),
+
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Poppins',
@@ -51,7 +57,8 @@ class App extends StatelessWidget {
       ),
 
       // Load shell with bottom navigation as the entry point
-      initialRoute: Routes.app,
+      //Call the page here to test page
+      initialRoute: Routes.vehiclelist,
 
       getPages: AppPages.pages,
     );
@@ -69,6 +76,14 @@ class Routes {
   static const reportBuilder = '/report-builder';
   static const mechanicFinder = '/mechanic-finder';
   static const aiScreen = '/aiscreen';
+  static const vehicleadd = '/vehicleadd';
+  static const vehiclelist = '/vehiclelist';
+
+  //Randiya UI's To Call
+  static const about = '/about';
+  static const profileEdit = '/profileEdit';
+  static const helpscreen = '/helpscreen';
+  static const profileTab = '/profileTab';
 }
 
 class AppPages {
@@ -76,6 +91,36 @@ class AppPages {
     GetPage(
       name: Routes.login,
       page: () => const LoginScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.about,
+      page: () => const AboutScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.profileEdit,
+      page: () => const EditProfileScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.helpscreen,
+      page: () => const HelpSupportScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.profileTab,
+      page: () => const ProfileScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.vehicleadd,
+      page: () => const AddVehicleScreen(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: Routes.vehiclelist,
+      page: () => const VehiclesScreen(),
       transition: Transition.cupertino,
     ),
     GetPage(
