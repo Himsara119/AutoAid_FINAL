@@ -1,76 +1,22 @@
+// lib/features/vehicles/screens/vehicles_list_screen.dart
 import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:iconsax/iconsax.dart';
-
-// Firebase
-import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../../app.dart';
+// Routes
+import '../../../app.dart' show Routes;
 
-// If you generated options, prefer:
-// import 'firebase_options.dart';
+// Domain model
+import '../models/vehicle_model.dart';
+
+// Centralized Firestore accessor
+import '../../../firestore_service.dart'; // exposes FirestoreService.db
 
 void _d(String msg, {Object? err, StackTrace? st, String tag = 'Vehicles'}) {
   if (kDebugMode) dev.log(msg, name: tag, error: err, stackTrace: st);
-}
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  try {
-    // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    await Firebase.initializeApp();
-    _d('Firebase.initializeApp() ✓');
-  } catch (e, st) {
-    _d('Firebase init failed: $e', err: e, st: st);
-    rethrow;
-  }
-  runApp(const VehiclesApp());
-}
-
-class VehiclesApp extends StatelessWidget {
-  const VehiclesApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    const purple = Color(0xFF7C4DFF);
-
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Vehicles',
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Poppins',
-        scaffoldBackgroundColor: Colors.white,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: purple,
-          primary: purple,
-          surface: Colors.white,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFFF5F6FA),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFE6E8ED)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFE6E8ED)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: purple, width: 1.2),
-          ),
-        ),
-      ),
-      home: const VehiclesScreen(),
-    );
-  }
 }
 
 class VehiclesScreen extends StatefulWidget {
@@ -81,15 +27,15 @@ class VehiclesScreen extends StatefulWidget {
 }
 
 class _VehiclesScreenState extends State<VehiclesScreen> {
-  int _tabIndex = 1; // keep your mock vibe
   String _filter = 'All';
   final _searchCtrl = TextEditingController();
 
-  // used to force rebuild of Stream when you press Refresh
+  // optional force-rebuild key for manual refresh
   int _reloadKey = 0;
 
   Query<Map<String, dynamic>> _buildQuery() {
-    final db = FirebaseFirestore.instance;
+    final db = FirestoreService.db;
+
     Query<Map<String, dynamic>> q =
     db.collection('vehicles').where('deleted', isEqualTo: false);
 
@@ -101,18 +47,18 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         q = q.where('status', isEqualTo: 'pending');
         break;
       default:
-      // All
-        break;
+        break; // All
     }
-    // deterministic order
+
+    // deterministic order; if filtering on status + ordering on created_at, you’ll need a composite index
     q = q.orderBy('created_at', descending: true);
+
     _d('Query built | filter=$_filter');
     return q;
   }
 
   Future<void> _refresh() async {
     _d('Manual refresh requested');
-    // The stream is realtime anyway, but this forces a rebuild
     setState(() => _reloadKey++);
     await Future<void>.delayed(const Duration(milliseconds: 150));
     if (!mounted) return;
@@ -126,7 +72,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     super.initState();
     _searchCtrl.addListener(() {
       _d('search="${_searchCtrl.text}"');
-      setState(() {});
+      setState(() {}); // local search, client-side
     });
   }
 
@@ -142,21 +88,6 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     final c = Theme.of(context).colorScheme;
 
     return Scaffold(
-      /*bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tabIndex,
-        onTap: (i) {
-          _d('BottomNav tapped index=$i');
-          setState(() => _tabIndex = i);
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: c.primary,
-        unselectedItemColor: const Color(0xFF98A2B3),
-        backgroundColor: const Color(0xFFF7F7FC),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Iconsax.home_1), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Iconsax.user), label: 'Profile'),
-        ],
-      ),*/
       body: SafeArea(
         child: Column(
           children: [
@@ -168,7 +99,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                   IconButton(
                     onPressed: () {
                       _d('Back pressed → go to Dashboard');
-                      Get.offAllNamed('/app');
+                      Get.offAllNamed(Routes.app);
                     },
                     icon: const Icon(Iconsax.arrow_left_2),
                   ),
@@ -182,17 +113,17 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                     child: Icon(Iconsax.car, color: c.primary),
                   ),
                   const SizedBox(width: 10),
-                  Text('Vehicles',
-                      style: t.titleLarge?.copyWith(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
-                      )),
+                  Text(
+                    'Vehicles',
+                    style: t.titleLarge?.copyWith(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
                   const Spacer(),
                   IconButton(
-                    onPressed: () {
-                      _d('Notifications tap (noop)');
-                    },
+                    onPressed: () => _d('Notifications tap (noop)'),
                     icon: const Icon(Iconsax.notification),
                   ),
                   IconButton(
@@ -216,7 +147,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
               ),
             ),
 
-            // Filters + funnel
+            // Filters
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
               child: Row(
@@ -254,7 +185,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
               child: RefreshIndicator(
                 onRefresh: _refresh,
                 child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  key: ValueKey(_reloadKey), // so pressing Refresh rebuilds
+                  key: ValueKey(_reloadKey), // pressing Refresh rebuilds
                   stream: _buildQuery().snapshots(),
                   builder: (context, snap) {
                     if (snap.connectionState == ConnectionState.waiting) {
@@ -265,25 +196,46 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                       return Center(child: Text('Error: ${snap.error}'));
                     }
 
-                    final docs = snap.data?.docs ?? [];
+                    final rawDocs = snap.data?.docs ?? [];
+
+                    // Map into domain models with schema guard
+                    final models = <VehicleModel>[];
+                    for (final d in rawDocs) {
+                      try {
+                        final data = d.data();
+
+                        // guard for dealership key inconsistency (legacy docs)
+                        data['dealershipId'] =
+                            data['dealershipId'] ?? data['dealership_id'];
+
+                        final vm = VehicleModel.fromDoc(d);
+                        models.add(vm);
+                      } catch (e, st) {
+                        _d('Doc parse failed id=${d.id} → $e', err: e, st: st);
+                      }
+                    }
+
+                    // Client-side search filter
                     final q = _searchCtrl.text.trim().toLowerCase();
                     final filtered = q.isEmpty
-                        ? docs
-                        : docs.where((d) {
-                      final m = d.data();
-                      final text = [
-                        m['make'] ?? '',
-                        m['model'] ?? '',
-                        m['vin'] ?? '',
-                        m['trim'] ?? '',
-                        m['fuel_type'] ?? '',
+                        ? models
+                        : models.where((m) {
+                      final haystack = [
+                        m.make,
+                        m.model,
+                        m.vin ?? '',
+                        m.trim,
+                        m.fuelType,
+                        m.year?.toString() ?? '',
+                        m.registrationNumber ?? '',
                       ].join(' ').toLowerCase();
-                      return text.contains(q);
+                      return haystack.contains(q);
                     }).toList();
 
-                    _d('Render list | total=${docs.length} filtered=${filtered.length}');
+                    _d('Render list | total=${models.length} filtered=${filtered.length}');
 
                     if (filtered.isEmpty) {
+                      // Empty state
                       return SingleChildScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         child: Padding(
@@ -296,35 +248,49 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                             buttonText: 'Add Vehicle',
                             onPressed: () async {
                               _d('CTA Add Vehicle from empty state');
-                              final result = await Get.toNamed(
-                                  Routes.vehicleadd,
-                                  parameters: {'source': 'vehicles_list'},    // optional
-                                  preventDuplicates: true);
+                              await Get.toNamed(
+                                Routes.vehicleadd,
+                                parameters: {'source': 'vehicles_list'},
+                                preventDuplicates: true,
+                              );
                             },
                           ),
                         ),
                       );
                     }
 
+                    // List (cards)
                     return ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
                       itemCount: filtered.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (_, i) {
-                        final v = filtered[i].data();
-                        final title =
-                        '${v['make'] ?? ''} ${v['model'] ?? ''}'.trim();
-                        final year = '${v['year'] ?? ''}';
-                        final type = _prettyFuel(v['fuel_type']);
-                        final vin = v['vin']?.toString() ?? '';
-                        final status = _prettyStatus(v['status']);
+                        final v = filtered[i];
+
+                        final title = '${v.make} ${v.model}'.trim();
+                        final year = v.year?.toString() ?? '';
+                        final type = _prettyFuel(v.fuelType);
+                        final vin = v.vin ?? '';
+                        final status = _prettyStatus(v.status);
+
+                        void _goToDetails() {
+                          if (v.id.isEmpty) return;
+                          _d('Navigate → details id=${v.id}');
+                          Get.toNamed(
+                            Routes.vehicleDetails, // singular, consistent
+                            parameters: {'id': v.id},
+                            preventDuplicates: true,
+                          );
+                        }
+
                         return _VehicleCard(
                           title: title,
                           year: year,
                           type: type,
                           vin: vin,
                           status: status,
-                          onTap: () => _d('Vehicle tap vin=$vin'),
+                          onTap: _goToDetails, // whole tile navigates
+                          onArrowTap: _goToDetails, // chevron navigates too
                         );
                       },
                     );
@@ -332,28 +298,6 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                 ),
               ),
             ),
-
-            // Big “Add Vehicle” button like your mock
-            /*SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton(
-                    onPressed: () {
-                      _d('CTA Add Vehicle from footer');
-                      // TODO: navigate to your AddVehicle screen
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Navigate to Add Vehicle')),
-                      );
-                    },
-                    child: const Text('Add Vehicle'),
-                  ),
-                ),
-              ),
-            ),*/
           ],
         ),
       ),
@@ -383,6 +327,8 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         return 'Sold';
       case 'archived':
         return 'Archived';
+      case 'active':
+        return 'Complete'; // UI label
       default:
         return 'Complete';
     }
@@ -534,6 +480,7 @@ class _VehicleCard extends StatelessWidget {
     required this.vin,
     required this.status,
     this.onTap,
+    this.onArrowTap,
   });
 
   final String title;
@@ -542,6 +489,7 @@ class _VehicleCard extends StatelessWidget {
   final String vin;
   final String status;
   final VoidCallback? onTap;
+  final VoidCallback? onArrowTap;
 
   Color _badgeBg() {
     switch (status) {
@@ -549,8 +497,10 @@ class _VehicleCard extends StatelessWidget {
         return const Color(0xFFFFF7E8);
       case 'Complete':
         return const Color(0xFFEFFAF3);
-      default:
+      case 'Sold':
         return const Color(0xFFEFF4FF);
+      default:
+        return const Color(0xFFF2F4F7);
     }
   }
 
@@ -560,8 +510,10 @@ class _VehicleCard extends StatelessWidget {
         return const Color(0xFFF59E0B);
       case 'Complete':
         return const Color(0xFF16A34A);
-      default:
+      case 'Sold':
         return const Color(0xFF2563EB);
+      default:
+        return const Color(0xFF475467);
     }
   }
 
@@ -569,7 +521,7 @@ class _VehicleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return InkWell(
-      onTap: onTap,
+      onTap: onTap, // whole tile press
       child: Ink(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -599,8 +551,7 @@ class _VehicleCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: t.titleLarge?.copyWith(color: const Color(0xFF0F172A))),
+                  Text(title, style: t.titleLarge?.copyWith(color: const Color(0xFF0F172A))),
                   const SizedBox(height: 4),
                   Text(year, style: t.bodyMedium?.copyWith(color: const Color(0xFF6B7280))),
                   Text(type, style: t.bodyMedium?.copyWith(color: const Color(0xFF6B7280))),
@@ -620,7 +571,11 @@ class _VehicleCard extends StatelessWidget {
                   child: Text(status, style: t.labelLarge?.copyWith(color: _badgeFg())),
                 ),
                 const SizedBox(height: 18),
-                Icon(Icons.chevron_right, color: Colors.black.withOpacity(0.5)),
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: onArrowTap ?? onTap, // chevron also navigates
+                  child: Icon(Icons.chevron_right, color: Colors.black.withOpacity(0.5)),
+                ),
               ],
             ),
           ],

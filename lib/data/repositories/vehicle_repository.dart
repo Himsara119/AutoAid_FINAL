@@ -7,15 +7,33 @@ class VehicleRepository {
   final CollectionReference<Map<String, dynamic>> _col =
   FirestoreService.db.collection('vehicles');
 
-  Future<int> countTotal({String? dealershipPath, String? buyerUserId}) async {
-    Query<Map<String, dynamic>> q = _col.where('deleted', isEqualTo: false);
-    q = q.where('status', whereIn: ['active', 'sold']);
+  /// Common scope:
+  /// - exclude soft-deleted
+  /// - optionally filter by dealership (path) OR buyer (RAW UID), not both
+  Query<Map<String, dynamic>> _scoped({
+    String? dealershipPath,
+    String? buyerUserId,
+  }) {
+    Query<Map<String, dynamic>> q =
+    _col.where('deleted', isEqualTo: false);
+
     if (dealershipPath != null && dealershipPath.isNotEmpty) {
       q = q.where('dealership_id', isEqualTo: dealershipPath);
     } else if (buyerUserId != null && buyerUserId.isNotEmpty) {
-      q = q.where('current_owner_id', isEqualTo: 'users/$buyerUserId');
+      // IMPORTANT: you store raw UID in current_owner_id, not 'users/uid'
+      q = q.where('current_owner_id', isEqualTo: buyerUserId);
     }
+
+    return q;
+  }
+
+  Future<int> countTotal({String? dealershipPath, String? buyerUserId}) async {
     try {
+      final q = _scoped(
+        dealershipPath: dealershipPath,
+        buyerUserId: buyerUserId,
+      ).where('status', whereIn: ['active', 'sold']);
+
       final res = await q.count().get();
       return res.count ?? 0;
     } catch (e) {
@@ -25,14 +43,12 @@ class VehicleRepository {
   }
 
   Future<int> countActive({String? dealershipPath, String? buyerUserId}) async {
-    Query<Map<String, dynamic>> q =
-    _col.where('deleted', isEqualTo: false).where('status', isEqualTo: 'active');
-    if (dealershipPath != null && dealershipPath.isNotEmpty) {
-      q = q.where('dealership_id', isEqualTo: dealershipPath);
-    } else if (buyerUserId != null && buyerUserId.isNotEmpty) {
-      q = q.where('current_owner_id', isEqualTo: 'users/$buyerUserId');
-    }
     try {
+      final q = _scoped(
+        dealershipPath: dealershipPath,
+        buyerUserId: buyerUserId,
+      ).where('status', isEqualTo: 'active');
+
       final res = await q.count().get();
       return res.count ?? 0;
     } catch (e) {
@@ -42,14 +58,12 @@ class VehicleRepository {
   }
 
   Future<int> countSold({String? dealershipPath, String? buyerUserId}) async {
-    Query<Map<String, dynamic>> q =
-    _col.where('deleted', isEqualTo: false).where('status', isEqualTo: 'sold');
-    if (dealershipPath != null && dealershipPath.isNotEmpty) {
-      q = q.where('dealership_id', isEqualTo: dealershipPath);
-    } else if (buyerUserId != null && buyerUserId.isNotEmpty) {
-      q = q.where('current_owner_id', isEqualTo: 'users/$buyerUserId');
-    }
     try {
+      final q = _scoped(
+        dealershipPath: dealershipPath,
+        buyerUserId: buyerUserId,
+      ).where('status', isEqualTo: 'sold');
+
       final res = await q.count().get();
       return res.count ?? 0;
     } catch (e) {

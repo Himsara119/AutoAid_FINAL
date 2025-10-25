@@ -114,9 +114,9 @@ class AlertsList extends StatelessWidget {
             child: const Icon(Iconsax.happyemoji, color: AppColors.info, size: 20),
           ),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text('No reminders right now.', style: t.bodyMedium?.copyWith(color: AppColors.muted)),
-          ),
+          //Expanded(
+            //child: Text('No reminders right now.', style: t.bodyMedium?.copyWith(color: AppColors.muted)),
+          //),
         ],
       ),
     );
@@ -165,7 +165,7 @@ class _ReminderCard extends StatelessWidget {
               children: [
                 Text(title, style: t.titleMedium),
                 const SizedBox(height: 4),
-                Text(body, style: t.bodyMedium?.copyWith(color: AppColors.muted)),
+                //Text(body, style: t.bodyMedium?.copyWith(color: AppColors.muted)),
                 const SizedBox(height: 8),
                 Row(
                   children: [

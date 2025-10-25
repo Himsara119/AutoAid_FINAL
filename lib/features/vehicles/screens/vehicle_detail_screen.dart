@@ -1,0 +1,483 @@
+// lib/features/vehicles/ui/vehicle_details_screen.dart
+import 'dart:developer' as dev;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
+
+import '../controllers/vehicle_detail_controller.dart';
+import '../models/vehicle_model.dart';
+
+// tabs
+import '../tabs/documents_tab.dart';
+import '../tabs/overview_tab.dart';
+import '../tabs/reports_tab.dart';
+import '../tabs/service_tab.dart';
+import 'edit_vehicle_screen.dart';
+
+class VehicleDetailsScreen extends GetView<VehicleDetailController> {
+  const VehicleDetailsScreen({super.key});
+
+  void _d(String msg, {Object? err, StackTrace? st}) {
+    if (kDebugMode) dev.log(msg, name: 'VehicleDetailsScreen', error: err, stackTrace: st);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme;
+    final divider = Theme.of(context).dividerColor;
+
+    if (!Get.isRegistered<VehicleDetailController>()) {
+      final id = Get.parameters['id'] ?? (Get.arguments as String?);
+      assert(id != null && id!.isNotEmpty, 'No vehicle id provided for VehicleDetailsScreen');
+      Get.put(VehicleDetailController(id!));
+      _d('Guard bound VehicleDetailController(id=$id)');
+    }
+
+    _d('build()');
+
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF7F8FA),
+        body: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverAppBar(
+              pinned: true,
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.white,
+              automaticallyImplyLeading: false,
+              titleSpacing: 0,
+              title: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Iconsax.arrow_left_2),
+                    onPressed: () {
+                      _d('Back pressed');
+                      Get.back();
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Vehicle Overview',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF475467),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Reload',
+                    onPressed: () {
+                      _d('hardReload tapped');
+                      controller.hardReload();
+                    },
+                    icon: const Icon(Iconsax.refresh),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(right: 6),
+                    child: Icon(Iconsax.more),
+                  ),
+                ],
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(height: 1, color: divider),
+              ),
+            ),
+
+            // IMAGE HERO: now reads from Firestore (primary_photo / photos[])
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: Obx(() {
+                  if (controller.loading.value) {
+                    return const _HeroSkeleton();
+                  }
+                  if (controller.error.value != null) {
+                    return _ErrorCard(text: controller.error.value!);
+                  }
+                  final v = controller.vehicle.value;
+                  if (v == null) return const _ImagePlaceholder();
+
+                  // Defensive reads: support either primaryPhoto or photos[0]
+                  final List<String> photos = _extractPhotos(v);
+                  if (photos.isEmpty) return const _ImagePlaceholder();
+
+                  return _HeroGallery(urls: photos);
+                }),
+              ),
+            ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                child: Obx(() {
+                  if (controller.loading.value) {
+                    _d('header: loading');
+                    return const _HeaderSkeleton();
+                  }
+                  if (controller.error.value != null) {
+                    _d('header: error → ${controller.error.value}');
+                    return Text(controller.error.value!, style: const TextStyle(color: Colors.red));
+                  }
+
+                  final VehicleModel v = controller.vehicle.value!;
+                  final t = Theme.of(context).textTheme;
+
+                  _d('header: data ✓ ${v.make} ${v.model} y=${v.year} mi=${v.mileage}');
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${v.make} ${v.model}'.trim(),
+                        style: t.titleLarge?.copyWith(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 22,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _MetaText(text: v.year > 0 ? v.year.toString() : '—'),
+                          const _Dot(),
+                          _MetaText(text: v.trim.isNotEmpty ? v.trim : '—'),
+                          const _Dot(),
+                          _MetaText(text: v.mileage > 0 ? '${v.mileage} km' : '—'),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  );
+                }),
+              ),
+            ),
+
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _TabsHeaderDelegate(
+                child: Container(
+                  color: Colors.white,
+                  alignment: Alignment.centerLeft,
+                  child: TabBar(
+                    isScrollable: true,
+                    labelColor: c.primary,
+                    unselectedLabelColor: const Color(0xFF6B7280),
+                    indicatorColor: c.primary,
+                    indicatorWeight: 3,
+                    labelStyle: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                    ),
+                    tabs: const [
+                      Tab(text: 'Overview'),
+                      Tab(text: 'Service History'),
+                      Tab(text: 'Documents'),
+                      Tab(text: 'Reports'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+          body: Obx(() {
+            if (controller.loading.value) {
+              _d('body: loading');
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (controller.error.value != null) {
+              _d('body: error → ${controller.error.value}');
+              return Center(child: Text(controller.error.value!));
+            }
+            _d('body: data ✓ render tabs');
+            return TabBarView(
+              children: [
+                const OverviewTab(),
+                const ServiceHistoryTab(),
+                DocumentsTab(
+                  vehicleId: controller.id, // controller.id was set via Get.put(VehicleDetailController(id))
+                ),
+                const ReportsTab(),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  // Pulls photos from VehicleModel with maximum tolerance for schema differences.
+  static List<String> _extractPhotos(VehicleModel v) {
+    final urls = <String>[];
+
+    // preferred: a photos array
+    try {
+      final p = v.photos; // if your model has `List<String> photos`
+      if (p != null) {
+        urls.addAll(p.where((e) => e is String && e.toString().trim().isNotEmpty).cast<String>());
+      }
+    } catch (_) {}
+
+    // secondary: primaryPhoto string field
+    try {
+      final prim = (v as dynamic).primaryPhoto as String?;
+      if (prim != null && prim.trim().isNotEmpty && !urls.contains(prim)) {
+        urls.insert(0, prim);
+      }
+    } catch (_) {}
+
+    // tertiary: map lookups, if your model exposes raw map
+    try {
+      final raw = (v as dynamic).raw as Map<String, dynamic>?;
+      if (raw != null) {
+        final prim = raw['primary_photo'] as String?;
+        final list = (raw['photos'] as List?)?.whereType<String>().toList() ?? const <String>[];
+        if (prim != null && prim.trim().isNotEmpty && !urls.contains(prim)) {
+          urls.insert(0, prim);
+        }
+        for (final u in list) {
+          if (!urls.contains(u) && u.trim().isNotEmpty) urls.add(u);
+        }
+      }
+    } catch (_) {}
+
+    return urls;
+  }
+}
+
+/* ------------------------ Header widgets ------------------------ */
+
+class _HeroSkeleton extends StatelessWidget {
+  const _HeroSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 160,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF1F6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD9DEE8)),
+      ),
+    );
+  }
+}
+
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 160,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5B3B3)),
+      ),
+      child: Text(text, style: const TextStyle(color: Colors.red)),
+    );
+  }
+}
+
+/// Shown if no images exist in Firestore.
+class _ImagePlaceholder extends StatelessWidget {
+  const _ImagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 160,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD9DEE8)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Color(0xFFEFF1F6),
+            child: Icon(Iconsax.camera, color: Color(0xFF98A2B3), size: 28),
+          ),
+          SizedBox(height: 10),
+          Text('No images', style: TextStyle(color: Color(0xFF98A2B3))),
+        ],
+      ),
+    );
+  }
+}
+
+/// Simple swipeable hero gallery with page dots.
+class _HeroGallery extends StatefulWidget {
+  const _HeroGallery({required this.urls});
+  final List<String> urls;
+
+  @override
+  State<_HeroGallery> createState() => _HeroGalleryState();
+}
+
+class _HeroGalleryState extends State<_HeroGallery> {
+  final _pc = PageController();
+  int _index = 0;
+
+  @override
+  void dispose() {
+    _pc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final urls = widget.urls;
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 160,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: PageView.builder(
+              controller: _pc,
+              itemCount: urls.length,
+              onPageChanged: (i) => setState(() => _index = i),
+              itemBuilder: (context, i) {
+                final u = urls[i];
+                // Keep it standard: Image.network handles your Firebase Storage URLs.
+                return Image.network(
+                  u,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, _, __) => const _BrokenImage(),
+                  loadingBuilder: (context, child, prog) {
+                    if (prog == null) return child;
+                    return const _HeroSkeleton();
+                  },
+                );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (urls.length > 1)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(urls.length, (i) {
+              final active = i == _index;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                height: 6,
+                width: active ? 18 : 6,
+                decoration: BoxDecoration(
+                  color: active ? const Color(0xFF475467) : const Color(0xFFD0D5DD),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              );
+            }),
+          ),
+      ],
+    );
+  }
+}
+
+class _BrokenImage extends StatelessWidget {
+  const _BrokenImage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFEFF1F6),
+      alignment: Alignment.center,
+      child: const Icon(Icons.broken_image_outlined, color: Color(0xFF98A2B3)),
+    );
+  }
+}
+
+class _HeaderSkeleton extends StatelessWidget {
+  const _HeaderSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: const [
+        _ShimmerBox(width: 180, height: 20),
+        SizedBox(height: 8),
+        _ShimmerBox(width: 220, height: 14),
+      ],
+    );
+  }
+}
+
+class _ShimmerBox extends StatelessWidget {
+  const _ShimmerBox({required this.width, required this.height});
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF1F6),
+        borderRadius: BorderRadius.circular(6),
+      ),
+    );
+  }
+}
+
+class _MetaText extends StatelessWidget {
+  const _MetaText({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF475467),
+        fontWeight: FontWeight.w600,
+        fontFamily: 'Poppins',
+      ),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  const _Dot();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      child: Text('•', style: TextStyle(color: Color(0xFF98A2B3))),
+    );
+  }
+}
+
+/* ----------------------- Tabs Header ------------------------ */
+
+class _TabsHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _TabsHeaderDelegate({required this.child});
+  final Widget child;
+
+  @override
+  double get minExtent => kToolbarHeight - 8;
+  @override
+  double get maxExtent => kToolbarHeight - 8;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => child;
+
+  @override
+  bool shouldRebuild(covariant _TabsHeaderDelegate oldDelegate) => false;
+}

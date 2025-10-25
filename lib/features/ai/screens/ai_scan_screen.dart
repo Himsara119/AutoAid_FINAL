@@ -1,19 +1,18 @@
-import 'dart:ui';
+// lib/features/visual_scan/ui/visual_scan_screen.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
-class VisualScanScreen extends StatefulWidget {
+import '../controllers/visual_scan_controller.dart';
+
+
+class VisualScanScreen extends StatelessWidget {
   const VisualScanScreen({super.key});
 
   @override
-  State<VisualScanScreen> createState() => _VisualScanScreenState();
-}
-
-class _VisualScanScreenState extends State<VisualScanScreen> {
-  ImageProvider? _preview; // set this when you actually pick/take a photo
-
-  @override
   Widget build(BuildContext context) {
+    final c = Get.find<VisualScanController>(); // put via binding before routing
     final t = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -41,7 +40,6 @@ class _VisualScanScreenState extends State<VisualScanScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Title + Subtitle
               Text(
                 'Scan Your Item',
                 style: t.headlineSmall?.copyWith(
@@ -59,96 +57,105 @@ class _VisualScanScreenState extends State<VisualScanScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Dashed placeholder with optional preview
               _DashedCard(
-                child: Container(
-                  width: double.infinity,
-                  height: 240, // slightly taller
-                  alignment: Alignment.center,
-                  child: _preview == null
-                      ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFF1E8FF),
-                          shape: BoxShape.circle,
+                child: Obx(() {
+                  final file = c.pickedImage.value;
+                  return Container(
+                    width: double.infinity,
+                    height: 240,
+                    alignment: Alignment.center,
+                    child: file == null
+                        ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF1E8FF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt_rounded,
+                            color: Color(0xFF7C3AED),
+                            size: 30,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.camera_alt_rounded, // filled camera
-                          color: Color(0xFF7C3AED),
-                          size: 30,
+                        const SizedBox(height: 12),
+                        Text(
+                          'No image selected',
+                          style: t.bodyMedium?.copyWith(
+                            color: const Color(0xFF9CA3AF),
+                            fontSize: 15,
+                          ),
                         ),
+                      ],
+                    )
+                        : ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.file(
+                        File(file.path),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: 240,
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No image selected',
-                        style: t.bodyMedium?.copyWith(
-                          color: const Color(0xFF9CA3AF),
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
-                  )
-                      : ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image(
-                      image: _preview!,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: 240,
                     ),
-                  ),
-                ),
+                  );
+                }),
               ),
-
 
               const SizedBox(height: 16),
 
-              // Primary CTA
               SizedBox(
                 height: 50,
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  // FILLED camera icon
-                  icon: const Icon(Icons.camera_alt_rounded, size: 20),
-                  label: const Text(
-                    'Upload / Take Photo',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    elevation: 4,
-                    shadowColor: const Color(0xFF7C3AED).withOpacity(0.25),
-                    backgroundColor: const Color(0xFF7C3AED),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                child: Obx(() {
+                  final hasImage = c.pickedImage.value != null;
+                  return ElevatedButton.icon(
+                    icon: hasImage
+                        ? const Icon(Iconsax.send_2, size: 20)
+                        : const Icon(Icons.camera_alt_rounded, size: 20),
+                    label: Text(
+                      hasImage ? 'Analyze & Send to Chat' : 'Upload / Take Photo',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                  ),
-                  onPressed: _pickAny,
-                ),
+                    style: ElevatedButton.styleFrom(
+                      elevation: 4,
+                      shadowColor: const Color(0xFF7C3AED).withOpacity(0.25),
+                      backgroundColor: const Color(0xFF7C3AED),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: () async {
+                      if (!hasImage) {
+                        _showSourceSheet(context, c);
+                      } else {
+                        await c.analyzeAndSendToChat();
+                      }
+                    },
+                  );
+                }),
               ),
 
               const SizedBox(height: 12),
 
-              // Secondary options
               Row(
                 children: [
                   Expanded(
                     child: _PillButton(
-                      icon: Icons.photo_rounded, // gallery icon
+                      icon: Icons.photo_rounded,
                       label: 'Gallery',
-                      onTap: _pickFromGallery,
+                      onTap: () => c.pickFromGallery(),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _PillButton(
-                      icon: Icons.camera_alt_rounded, // FILLED camera icon
+                      icon: Icons.camera_alt_rounded,
                       label: 'Camera',
-                      onTap: _pickFromCamera,
+                      onTap: () => c.pickFromCamera(),
                     ),
                   ),
                 ],
@@ -156,10 +163,8 @@ class _VisualScanScreenState extends State<VisualScanScreen> {
 
               const SizedBox(height: 18),
 
-              // Recent Scans
-              Text('Recent Scans', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+              /*Text('Recent Scans', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 10),
-
               const _RecentScanTile(
                 iconBg: Color(0xFFEFFAF3),
                 iconColor: Color(0xFF16A34A),
@@ -172,7 +177,16 @@ class _VisualScanScreenState extends State<VisualScanScreen> {
                 iconColor: Color(0xFF16A34A),
                 title: 'Audi',
                 subtitle: '1 day ago',
-              ),
+              ),*/
+
+              const SizedBox(height: 12),
+              Obx(() => c.loading.value ? const LinearProgressIndicator() : const SizedBox.shrink()),
+              Obx(() => c.error.value != null
+                  ? Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(c.error.value!, style: const TextStyle(color: Colors.red)),
+              )
+                  : const SizedBox.shrink()),
             ],
           ),
         ),
@@ -180,10 +194,29 @@ class _VisualScanScreenState extends State<VisualScanScreen> {
     );
   }
 
-  // TODO: wire these to image_picker or your own service.
-  void _pickAny() {/* open action sheet or route */}
-  void _pickFromGallery() {/* pick from gallery */}
-  void _pickFromCamera() {/* take photo */}
+  void _showSourceSheet(BuildContext ctx, VisualScanController c) {
+    showModalBottomSheet(
+      context: ctx,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Iconsax.gallery),
+              title: const Text('Gallery'),
+              onTap: () { Navigator.pop(ctx); c.pickFromGallery(); },
+            ),
+            ListTile(
+              leading: const Icon(Iconsax.camera),
+              title: const Text('Camera'),
+              onTap: () { Navigator.pop(ctx); c.pickFromCamera(); },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /* ---------------------------- UI BUILDING BLOCKS --------------------------- */
@@ -323,7 +356,7 @@ class _RecentScanTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-            child: const Icon(Iconsax.car, color: Color(0xFF16A34A), size: 18),
+            child: Icon(Iconsax.car, color: iconColor, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(

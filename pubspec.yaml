@@ -36,6 +36,7 @@ dependencies:
   readmore: ^3.0.0
   carousel_slider: ^5.1.1
   flutter_rating_bar: ^4.0.1
+  file_picker: ^10.3.3
 
   #Firebase
   firebase_core: ^4.1.1
@@ -45,6 +46,10 @@ dependencies:
   firebase_messaging: ^16.0.2
   flutter_local_notifications: ^19.4.2
 
+  #AI
+  image_picker: ^1.2.0
+  tflite_flutter: ^0.11.0
+  image: ^4.5.4
 
 
 dev_dependencies:
@@ -70,6 +75,8 @@ flutter:
     - assets/icons/payment_methods/
     - assets/images/products/
     - assets/reviews/
+    - assets/ml/model.tflite
+    - assets/ml/labels.txt
 
 
   fonts:

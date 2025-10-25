@@ -1,27 +1,37 @@
 // lib/app.dart
+import 'dart:developer' as dev;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+// Screens
 import 'package:finalapp/features/profile/screens/about_screen.dart';
 import 'package:finalapp/features/profile/screens/help_screen.dart';
 import 'package:finalapp/features/profile/screens/profile_edit_screen.dart';
-import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:finalapp/features/vehicles/tabs/reports_tab.dart';
+import 'package:finalapp/features/vehicles/screens/add_vehicle_screen.dart';
+import 'package:finalapp/features/vehicles/screens/vehicle_detail_screen.dart';
+import 'package:finalapp/features/vehicles/screens/vehicles_list_screen.dart';
+import 'package:finalapp/features/vehicles/tabs/overview_tab.dart';
+import 'package:finalapp/features/services/presentation/service_detail_screen.dart';
 
 // Global bindings
 import 'bindings/general_bindings.dart';
 
 // Auth + shell
+import 'features/ai/bindings/chat_binding.dart';
+import 'features/ai/bindings/visual_scan_binding.dart';
+import 'features/ai/screens/ai_chat_screen.dart';
+import 'features/ai/screens/ai_scan_screen.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/mechanics/screens/mechanic_map_screen.dart';
+import 'features/profile/screens/profile_view_screen.dart';
+import 'features/reports/screens/report_builder_screen.dart';
+import 'features/reports/screens/report_preview_screen.dart';
 import 'features/shell/app_shell.dart';
 
-// Core feature screens
-import 'features/profile/screens/profile_view_screen.dart';
-import 'features/vehicles/screens/vehicles_list_screen.dart';
-
-// Quick actions / other flows
-import 'features/ai/screens/ai_chat_screen.dart';            // AI Assistant
-import 'features/ai/screens/ai_scan_screen.dart';            // Visual Scan
-import 'features/vehicles/screens/add_vehicle_screen.dart';  // Add Vehicle
-import 'features/reports/screens/report_builder_screen.dart'; // Report Builder
-import 'features/mechanics/screens/mechanic_map_screen.dart'; // Find Mechanic
+// Controller for binding
+import 'features/vehicles/controllers/vehicle_detail_controller.dart';
 
 /* ------------------------------- MAIN APP ------------------------------- */
 
@@ -35,7 +45,7 @@ class App extends StatelessWidget {
       initialBinding: GeneralBindings(),
       title: 'FinalApp',
 
-      defaultTransition: Transition.cupertino, // choose any style you want
+      defaultTransition: Transition.cupertino,
       transitionDuration: const Duration(milliseconds: 400),
 
       theme: ThemeData(
@@ -56,8 +66,7 @@ class App extends StatelessWidget {
         ),
       ),
 
-      // Load shell with bottom navigation as the entry point
-      //Call the page here to test page
+      // Do NOT start on a route that needs params
       initialRoute: Routes.vehiclelist,
 
       getPages: AppPages.pages,
@@ -78,6 +87,11 @@ class Routes {
   static const aiScreen = '/aiscreen';
   static const vehicleadd = '/vehicleadd';
   static const vehiclelist = '/vehiclelist';
+  static const vehicleDetails = '/vehicleDetails'; // used by list screen
+  static const overview = '/overview';
+  static const chat = '/chat';
+  static const reportScreen = '/reportScreen';
+  static const serviceDetail = '/serviceDetail';
 
   //Randiya UI's To Call
   static const about = '/about';
@@ -93,11 +107,62 @@ class AppPages {
       page: () => const LoginScreen(),
       transition: Transition.cupertino,
     ),
+
+    // Service detail REQUIRES vehicleId + serviceId. No const. Pull from params/args.
+    GetPage(
+      name: Routes.serviceDetail,
+      page: () {
+        // Support either /serviceDetail?vehicleId=...&serviceId=... or Get.toNamed(..., arguments:{...})
+        final p = Get.parameters;
+        final a = Get.arguments;
+        final vehicleId = p['vehicleId'] ?? (a is Map ? a['vehicleId'] as String? : null);
+        final serviceId = p['serviceId'] ?? (a is Map ? a['serviceId'] as String? : null);
+
+        assert(vehicleId != null && vehicleId!.isNotEmpty, 'vehicleId is required');
+        assert(serviceId != null && serviceId!.isNotEmpty, 'serviceId is required');
+
+        return ServiceDetailScreen(
+          vehicleId: vehicleId!,
+          serviceId: serviceId!,
+        );
+      },
+      transition: Transition.cupertino,
+    ),
+
+    GetPage(
+      name: Routes.reportScreen,
+      page: () => const ConditionReportScreen(),
+      transition: Transition.cupertino,
+    ),
+
+    // Chat route (bind controller)
+    GetPage(
+      name: Routes.chat,
+      page: () => const AiDiagnosisChatScreen(),
+      binding: ChatBinding(),
+      transition: Transition.cupertino,
+    ),
+
     GetPage(
       name: Routes.about,
       page: () => const AboutScreen(),
       transition: Transition.cupertino,
     ),
+
+    // Vehicle details route binds VehicleDetailController with the id
+    GetPage(
+      name: Routes.vehicleDetails,
+      page: () => const VehicleDetailsScreen(),
+      binding: BindingsBuilder(() {
+        final id = Get.parameters['id'] ?? (Get.arguments as String?);
+        assert(id != null && id!.isNotEmpty, 'Vehicle id missing');
+        // tag = id so each vehicle gets its own controller instance
+        Get.lazyPut(() => VehicleDetailController(id!), tag: id, fenix: false);
+        dev.log('Route bind → vehicle id=$id', name: 'Routes');
+      }),
+      transition: Transition.cupertino,
+    ),
+
     GetPage(
       name: Routes.profileEdit,
       page: () => const EditProfileScreen(),
@@ -133,16 +198,22 @@ class AppPages {
       page: () => const ProfileScreen(),
       transition: Transition.cupertino,
     ),
+
+    // Note: you had addVehicle -> VehiclesScreen. Keeping it unchanged per your comment.
     GetPage(
       name: Routes.addVehicle,
       page: () => const VehiclesScreen(),
       transition: Transition.cupertino,
     ),
+
+    // Visual Scan (bind controller)
     GetPage(
       name: Routes.visualScan,
       page: () => const VisualScanScreen(),
+      binding: VisualScanBinding(),
       transition: Transition.cupertino,
     ),
+
     GetPage(
       name: Routes.reportBuilder,
       page: () => const ReportBuilderScreen(),
@@ -153,9 +224,12 @@ class AppPages {
       page: () => const FindMechanicScreen(),
       transition: Transition.cupertino,
     ),
+
+    // Alias to the same AI chat screen; bind it too so it never crashes.
     GetPage(
       name: Routes.aiScreen,
       page: () => const AiDiagnosisChatScreen(),
+      binding: ChatBinding(),
       transition: Transition.cupertino,
     ),
   ];
@@ -176,5 +250,4 @@ class AppColors {
   static const dangerBg = Color(0xFFFFEEEE);
   static const info = Color(0xFF2563EB);
   static const infoBg = Color(0xFFEFF4FF);
-  static const muted = Color(0xFF6B7280);
 }

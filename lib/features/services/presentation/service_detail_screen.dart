@@ -1,37 +1,89 @@
+// lib/features/services/presentation/service_detail_screen.dart
+import 'dart:developer' as dev;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intl/intl.dart';
 
-void main() => runApp(const ServiceDetailFixedApp());
+import '../../vehicles/models/service_record.dart';
+import 'add_service_screen.dart';
 
-class ServiceDetailFixedApp extends StatelessWidget {
-  const ServiceDetailFixedApp({super.key});
+class ServiceDetailScreen extends StatefulWidget {
+  const ServiceDetailScreen({
+    super.key,
+    required this.vehicleId,
+    this.serviceId,
+    this.record,
+    this.databaseId = 'autoaid',
+  }) : assert(
+  serviceId != null || record != null,
+  'Provide either serviceId or record',
+  );
+
+  final String vehicleId;
+  final String? serviceId;      // for deep-links or refresh
+  final ServiceRecord? record;  // for instant render
+  final String databaseId;
 
   @override
-  Widget build(BuildContext context) {
-    const purple = Color(0xFF7C4DFF);
-
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Service Detail',
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Poppins',
-        scaffoldBackgroundColor: const Color(0xFFF7F8FA),
-        colorScheme: ColorScheme.fromSeed(seedColor: purple, primary: purple, surface: Colors.white),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF111827),
-          elevation: 0,
-          centerTitle: false,
-        ),
-      ),
-      home: const ServiceDetailScreen(),
-    );
-  }
+  State<ServiceDetailScreen> createState() => _ServiceDetailScreenState();
 }
 
-class ServiceDetailScreen extends StatelessWidget {
-  const ServiceDetailScreen({super.key});
+class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
+  final _df = DateFormat.yMMMMd();
+  bool _loading = true;
+  String? _error;
+  late FirebaseFirestore _db;
+
+  ServiceRecord? _record;
+
+  void _d(String msg, {Object? err, StackTrace? st}) {
+    if (kDebugMode) dev.log(msg, name: 'ServiceDetail', error: err, stackTrace: st);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _db = FirebaseFirestore.instanceFor(app: Firebase.app(), databaseId: widget.databaseId);
+
+    // If a record was passed, render immediately. If only id was passed, fetch.
+    if (widget.record != null) {
+      _record = widget.record;
+      _loading = false;
+      setState(() {});
+    } else {
+      _fetchById();
+    }
+  }
+
+  Future<void> _fetchById([String? explicitId]) async {
+    try {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+
+      // Prefer explicit id (from edit result), then widget.serviceId, then current record id.
+      final sid = explicitId ?? widget.serviceId ?? _record?.id;
+      if (sid == null || sid.isEmpty) {
+        throw StateError('Missing service id to fetch');
+      }
+
+      final path = 'vehicles/${widget.vehicleId}/services/$sid';
+      _d('GET $path');
+      final doc = await _db.doc(path).get();
+      if (!doc.exists) throw StateError('Service record not found');
+      _record = ServiceRecord.fromDoc(doc);
+    } catch (e, st) {
+      _d('Fetch failed', err: e, st: st);
+      _error = e.toString();
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,97 +91,146 @@ class ServiceDetailScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(onPressed: () {}, icon: const Icon(Iconsax.arrow_left_2)),
-        title: const Text(''), // leave blank so title shows in body
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: const Color(0xFFE7E9EF)),
+        leading: IconButton(onPressed: () => Get.back(), icon: const Icon(Iconsax.arrow_left_2)),
+        title: const Text(''),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, color: Color(0xFFE7E9EF)),
         ),
       ),
 
-      bottomNavigationBar: const _BottomActions(),
+      bottomNavigationBar: _record == null
+          ? null
+          : _BottomActions(
+        onEdit: () async {
+          // open the editor, wait for result
+          final res = await Get.to(() => AddServiceRecordScreen(
+            vehicleId: widget.vehicleId,
+            existing: _record,      // prefill
+            serviceId: _record!.id, // just in case
+          ));
+
+          // if updated, re-fetch to refresh this page
+          if (res is Map && res['saved'] == true) {
+            await _fetchById(_record!.id);
+          }
+
+          // if deleted, close details
+          if (res is Map && res['deleted'] == true) {
+            if (mounted) Get.back(result: {'deleted': true, 'serviceId': _record!.id});
+          }
+        },
+        onClose: () => Get.back(),
+      ),
 
       body: SafeArea(
-        child: ListView(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+            ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+            : ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
           children: [
             // Title + badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Oil Change',
-                    style: t.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800, fontSize: 26, color: const Color(0xFF111827))),
-                const _StatusBadgeCompleted(),
+                Text(
+                  _record!.type.isNotEmpty ? _record!.type : 'Service',
+                  style: t.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 26,
+                    color: const Color(0xFF111827),
+                  ),
+                ),
+                _StatusBadge(status: _record!.status),
               ],
             ),
             const SizedBox(height: 16),
 
             _RoundedSection(
               child: Column(
-                children: const [
-                  _KVRow(label: 'Date', value: 'March 15, 2024'),
-                  _DividerThin(),
-                  _KVRow(label: 'Mileage', value: '45,230 miles'),
-                  _DividerThin(),
-                  _KVRow(label: 'Cost', value: '\$89.99'),
-                  _DividerThin(),
-                  _KVRow(label: 'Workshop', value: 'Quick Lube Express'),
-                  _DividerThin(),
-                  _KVRow(label: 'Next Service', value: 'June 15, 2024'),
+                children: [
+                  _KVRow(label: 'Date', value: _df.format(_record!.serviceDate)),
+                  const _DividerThin(),
+                  _KVRow(label: 'Mileage', value: '${_fmtMiles(_record!.mileage)} miles'),
+                  const _DividerThin(),
+                  _KVRow(
+                    label: 'Cost',
+                    value: _record!.cost > 0 ? '\$${_record!.cost.toStringAsFixed(2)}' : '—',
+                  ),
+                  const _DividerThin(),
+                  _KVRow(
+                    label: 'Workshop',
+                    value: _record!.provider.isNotEmpty ? _record!.provider : '—',
+                  ),
+                  const _DividerThin(),
+                  _KVRow(
+                    label: 'Next Service',
+                    value: _record!.nextServiceDate != null
+                        ? _df.format(_record!.nextServiceDate!)
+                        : '—',
+                  ),
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
 
-            _CardBlock(
-              header: Text('Notes', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              child: const Text(
-                'Regular maintenance service completed. Oil filter replaced with premium grade filter. '
-                    'Engine oil changed to 5W-30 synthetic blend. '
-                    'All fluid levels checked and topped off. No issues detected during inspection.',
-                style: TextStyle(color: Color(0xFF374151), height: 1.6, fontSize: 15),
+            if (_record!.notes.isNotEmpty)
+              _CardBlock(
+                header: Text('Notes', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                child: Text(
+                  _record!.notes,
+                  style: const TextStyle(color: Color(0xFF374151), height: 1.6, fontSize: 15),
+                ),
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            _CardBlock(
-              header: Text('Invoice', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              child: const _FileTile(
-                icon: Iconsax.document_text,
-                fileName: 'oil-change-receipt.pdf',
-                sizeText: '124 KB',
-                actionText: 'View',
-              ),
-            ),
           ],
         ),
       ),
     );
   }
+
+  static String _fmtMiles(int n) {
+    final s = n.toString();
+    final b = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      final left = s.length - i;
+      b.write(s[i]);
+      if (left > 1 && left % 3 == 1) b.write(',');
+    }
+    return b.toString();
+  }
 }
 
-/* ---------------- Widgets ---------------- */
+/* ---------------- Visual bits ---------------- */
 
-class _StatusBadgeCompleted extends StatelessWidget {
-  const _StatusBadgeCompleted({super.key});
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+  final String status;
 
   @override
   Widget build(BuildContext context) {
+    final done = status.toLowerCase() == 'completed';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAFBF0),
+        color: done ? const Color(0xFFEAFBF0) : const Color(0xFFFFF2CC),
         borderRadius: BorderRadius.circular(22),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Iconsax.tick_circle, size: 16, color: Color(0xFF168A45)),
-          SizedBox(width: 8),
-          Text('Completed', style: TextStyle(color: Color(0xFF168A45), fontWeight: FontWeight.w700)),
+          Icon(done ? Iconsax.tick_circle : Iconsax.timer_1,
+              size: 16, color: done ? const Color(0xFF168A45) : const Color(0xFF946200)),
+          const SizedBox(width: 8),
+          Text(
+            done ? 'Completed' : 'Due',
+            style: TextStyle(
+              color: done ? const Color(0xFF168A45) : const Color(0xFF946200),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -137,9 +238,8 @@ class _StatusBadgeCompleted extends StatelessWidget {
 }
 
 class _RoundedSection extends StatelessWidget {
-  const _RoundedSection({required this.child, super.key});
+  const _RoundedSection({required this.child});
   final Widget child;
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -155,15 +255,13 @@ class _RoundedSection extends StatelessWidget {
 }
 
 class _DividerThin extends StatelessWidget {
-  const _DividerThin({super.key});
+  const _DividerThin();
   @override
-  Widget build(BuildContext context) {
-    return const Divider(height: 1, color: Color(0xFFE6E8ED));
-  }
+  Widget build(BuildContext context) => const Divider(height: 1, color: Color(0xFFE6E8ED));
 }
 
 class _KVRow extends StatelessWidget {
-  const _KVRow({required this.label, required this.value, super.key});
+  const _KVRow({required this.label, required this.value});
   final String label;
   final String value;
 
@@ -174,11 +272,15 @@ class _KVRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-              child: Text(label,
-                  style: const TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w700))),
-          Text(value,
-              style:
-              const TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w700, fontSize: 16)),
+            child: Text(
+              label,
+              style: const TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w700),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w700, fontSize: 16),
+          ),
         ],
       ),
     );
@@ -186,93 +288,32 @@ class _KVRow extends StatelessWidget {
 }
 
 class _CardBlock extends StatelessWidget {
-  const _CardBlock({required this.header, required this.child, super.key});
+  const _CardBlock({required this.header, required this.child});
   final Widget header;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        header,
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF9FAFB),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE6E8ED)),
-          ),
-          padding: const EdgeInsets.all(14),
-          child: child,
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      header,
+      const SizedBox(height: 10),
+      Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE6E8ED)),
         ),
-      ],
-    );
-  }
-}
-
-class _FileTile extends StatelessWidget {
-  const _FileTile({
-    required this.icon,
-    required this.fileName,
-    required this.sizeText,
-    required this.actionText,
-    super.key,
-  });
-
-  final IconData icon;
-  final String fileName;
-  final String sizeText;
-  final String actionText;
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE6E8ED)),
-        borderRadius: BorderRadius.circular(14),
+        padding: const EdgeInsets.all(14),
+        child: child,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: primary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(fileName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF111827))),
-                const SizedBox(height: 4),
-                Text(sizeText, style: const TextStyle(color: Color(0xFF6B7280))),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(actionText, style: TextStyle(color: primary, fontWeight: FontWeight.w800)),
-          const SizedBox(width: 6),
-          const Icon(Iconsax.arrow_right_3, color: Color(0xFF98A2B3)),
-        ],
-      ),
-    );
+    ]);
   }
 }
 
 class _BottomActions extends StatelessWidget {
-  const _BottomActions({super.key});
+  const _BottomActions({required this.onEdit, required this.onClose});
+  final VoidCallback onEdit;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +329,7 @@ class _BottomActions extends StatelessWidget {
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: () {},
+              onPressed: onEdit,
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 side: BorderSide(color: primary),
@@ -301,7 +342,7 @@ class _BottomActions extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: FilledButton(
-              onPressed: () {},
+              onPressed: onClose,
               style: FilledButton.styleFrom(
                 backgroundColor: primary,
                 padding: const EdgeInsets.symmetric(vertical: 16),

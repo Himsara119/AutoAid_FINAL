@@ -122,9 +122,7 @@ class _AddServiceRecordScreenState extends State<AddServiceRecordScreen> {
       _d('GET $path');
       final doc = await _db.doc(path).get();
       if (!doc.exists) throw StateError('Service record not found');
-
-      // IMPORTANT: pass vehicleId so the model is fully populated
-      final r = ServiceRecord.fromDoc(doc, vehicleId: widget.vehicleId);
+      final r = ServiceRecord.fromDoc(doc);
       _bind(r);
       _serviceId = r.id;
     } catch (e, st) {
@@ -191,7 +189,7 @@ class _AddServiceRecordScreenState extends State<AddServiceRecordScreen> {
 
       // create or update
       final bool isUpdate = _serviceId != null && _serviceId!.isNotEmpty;
-      final docRef = isUpdate ? col.doc(_serviceId!) : col.doc(); // ← safe bang
+      final docRef = isUpdate ? col.doc(_serviceId) : col.doc();
 
       final payload = <String, dynamic>{
         'service_id': docRef.id,
@@ -345,9 +343,7 @@ class _AddServiceRecordScreenState extends State<AddServiceRecordScreen> {
                           value: e,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Text(e,
-                                style:
-                                const TextStyle(fontWeight: FontWeight.w600)),
+                            child: Text(e, style: const TextStyle(fontWeight: FontWeight.w600)),
                           ),
                         ),
                       )
@@ -388,8 +384,7 @@ class _AddServiceRecordScreenState extends State<AddServiceRecordScreen> {
                 const _FieldLabel('Workshop / Provider'),
                 TextFormField(
                   controller: _workshopCtrl,
-                  decoration: const InputDecoration(
-                      hintText: 'Enter workshop or service provider'),
+                  decoration: const InputDecoration(hintText: 'Enter workshop or service provider'),
                 ),
                 const SizedBox(height: 16),
 
@@ -397,10 +392,8 @@ class _AddServiceRecordScreenState extends State<AddServiceRecordScreen> {
                 const _FieldLabel('Cost'),
                 TextFormField(
                   controller: _costCtrl,
-                  keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-                  decoration:
-                  const InputDecoration(prefixText: '\$ ', hintText: '0.00'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(prefixText: '\$ ', hintText: '0.00'),
                 ),
                 const SizedBox(height: 16),
 
@@ -422,15 +415,11 @@ class _AddServiceRecordScreenState extends State<AddServiceRecordScreen> {
                     onPressed: _loading ? null : _save,
                     style: FilledButton.styleFrom(
                       backgroundColor: c.primary,
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
-                      textStyle: const TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                     ),
-                    child:
-                    Text(isEditing ? 'Save Changes' : 'Save Record'),
+                    child: Text(isEditing ? 'Save Changes' : 'Save Record'),
                   ),
                 ),
               ],

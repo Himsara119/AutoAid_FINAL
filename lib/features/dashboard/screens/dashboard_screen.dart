@@ -1,3 +1,4 @@
+// lib/features/dashboard/screens/dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -15,6 +16,22 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+
+  @override
+  void initState() {
+    super.initState();
+    // Post-frame refresh so the Obx on this screen rebuilds with fresh numbers
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (Get.isRegistered<VehicleStatsController>()) {
+        try {
+          await Get.find<VehicleStatsController>().refreshCounts();
+        } catch (_) {
+          // don't blow up the dashboard if something hiccups
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
@@ -118,7 +135,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     icon: Iconsax.add_square,
                     title: 'Add Vehicle',
                     subtitle: 'Register new car',
-                    onTap: () => Get.toNamed(Routes.addVehicle), // make sure this maps to AddVehicleScreen
+                    onTap: () => Get.toNamed(Routes.vehicleadd),
                   ),
                   QuickActionCard(
                     iconBg: const Color(0xFFEFF4FF),
@@ -148,7 +165,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
 
-            // Vehicle Overview (reactive)
+            // Vehicle Overview (reactive, tappable)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
@@ -158,41 +175,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                child: Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: AppColors.tileBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => Get.toNamed(
+                    Routes.vehiclelist, // open list with All filter by default
+                    parameters: {'filter': 'All'},
+                    preventDuplicates: true,
                   ),
-                  child: Obx(() {
-                    if (stats.loading.value) {
+                  child: Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: AppColors.tileBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Obx(() {
+                      final stats = Get.find<VehicleStatsController>();
+                      if (stats.loading.value) {
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: const [_SkeletonStat(), _SkeletonStat(), _SkeletonStat()],
+                        );
+                      }
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [_SkeletonStat(), _SkeletonStat(), _SkeletonStat()],
+                        children: [
+                          StatItem(
+                            icon: Iconsax.car,
+                            label: 'Vehicles',
+                            value: '${stats.total.value}',
+                            onTap: () => Get.toNamed(
+                              Routes.vehiclelist,
+                              parameters: {'filter': 'All'},
+                              preventDuplicates: true,
+                            ),
+                          ),
+                          StatItem(
+                            icon: Iconsax.tick_circle,
+                            label: 'Active',
+                            value: '${stats.active.value}',
+                            iconColor: AppColors.success,
+                            iconBg: AppColors.successBg,
+                            onTap: () => Get.toNamed(
+                              Routes.vehiclelist,
+                              parameters: {'filter': 'Active'},
+                              preventDuplicates: true,
+                            ),
+                          ),
+                          StatItem(
+                            icon: Iconsax.receipt_item,
+                            label: 'Sold',
+                            value: '${stats.sold.value}',
+                            iconColor: const Color(0xFF0F172A),
+                            iconBg: const Color(0xFFEFF1F5),
+                            onTap: () => Get.toNamed(
+                              Routes.vehiclelist,
+                              parameters: {'filter': 'Sold'},
+                              preventDuplicates: true,
+                            ),
+                          ),
+                        ],
                       );
-                    }
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        StatItem(icon: Iconsax.car, label: 'Vehicles', value: '${stats.total.value}'),
-                        StatItem(
-                          icon: Iconsax.tick_circle,
-                          label: 'Active',
-                          value: '${stats.active.value}',
-                          iconColor: AppColors.success,
-                          iconBg: AppColors.successBg,
-                        ),
-                        StatItem(
-                          icon: Iconsax.receipt_item,
-                          label: 'Sold',
-                          value: '${stats.sold.value}',
-                          iconColor: const Color(0xFF0F172A),
-                          iconBg: const Color(0xFFEFF1F5),
-                        ),
-                      ],
-                    );
-                  }),
+                    }),
+                  ),
                 ),
               ),
             ),
@@ -308,6 +353,7 @@ class StatItem extends StatelessWidget {
     required this.value,
     this.iconBg = AppColors.blueLight,
     this.iconColor = AppColors.blue,
+    this.onTap,
   });
 
   final IconData icon;
@@ -315,23 +361,31 @@ class StatItem extends StatelessWidget {
   final String value;
   final Color iconBg;
   final Color iconColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
 
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-          child: Icon(icon, color: iconColor, size: 22),
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor, size: 22),
+            ),
+            const SizedBox(height: 12),
+            Text(value, style: t.titleLarge),
+            const SizedBox(height: 6),
+            Text(label, style: t.bodyMedium?.copyWith(color: AppColors.muted)),
+          ],
         ),
-        const SizedBox(height: 12),
-        Text(value, style: t.titleLarge),
-        const SizedBox(height: 6),
-        Text(label, style: t.bodyMedium?.copyWith(color: AppColors.muted)),
-      ],
+      ),
     );
   }
 }
