@@ -1,12 +1,31 @@
 // lib/features/reports/ui/condition_report_screen.dart
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:url_launcher/url_launcher_string.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../controllers/report_detail_controller.dart';
+import '../models/report_entity.dart';
 
 class ConditionReportScreen extends StatelessWidget {
-  const ConditionReportScreen({super.key});
+  const ConditionReportScreen({
+    super.key,
+    required this.vehicleId,
+    required this.reportId,
+  });
+
+  final String vehicleId;
+  final String reportId;
 
   @override
   Widget build(BuildContext context) {
+    final ctrl = Get.put(
+      ReportDetailController(vehicleId: vehicleId, reportId: reportId),
+      tag: 'report_detail_${vehicleId}_$reportId',
+    );
+
     final t = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -19,215 +38,318 @@ class ConditionReportScreen extends StatelessWidget {
           icon: const Icon(Iconsax.arrow_left_2, color: Color(0xFF111827)),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const Text('Condition Report',
-            style: TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w700)),
+        title: Text(
+          'Condition Report',
+          style: t.titleMedium?.copyWith(
+            color: const Color(0xFF111827),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_vert, color: Color(0xFF111827)),
-          )
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 4),
+            child: Icon(Icons.more_vert, color: Color(0xFF111827)),
+          ),
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 120),
+        child: Obx(() {
+          if (ctrl.loading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final ReportModel? r = ctrl.report.value;
+          if (r == null) {
+            return const Center(child: Text('Report not found'));
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 160),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Generated on ${_fmtLongDate(_asDateTime(r.createdAt ?? r.updatedAt))}',
+                      style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12.5),
+                    ),
+                    const Spacer(),
+                    const _Chip(label: 'Valid', color: Color(0xFF22C55E)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                _SectionCard(
+                  title: 'Summary',
+                  child: Column(
+                    children: [
+                      _SummaryRow(label: 'Vehicle', value: r.vehicleId),
+                      const _Divider(),
+                      const _SummaryRow(
+                        label: 'VIN',
+                        value: '2HGFC2F59LH123456',
+                        isLink: true,
+                      ),
+                      const _Divider(),
+                      const _SummaryRow(label: 'Mileage', value: '—'),
+                      const _Divider(),
+                      _SummaryRow(
+                        label: 'Inspection Date',
+                        value: _fmtShortDate(_asDateTime(r.createdAt ?? r.updatedAt)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const _SectionCard(
+                  title: 'Key Metrics',
+                  child: Column(
+                    children: [
+                      _MetricOverall(score: '8.5', outOf: '/10'),
+                      _Divider(),
+                      _MetricRow(
+                        label: 'Exterior',
+                        rating: 'Good',
+                        desc:
+                        'Minor scratches on rear bumper; paint in\nexcellent condition',
+                      ),
+                      _Divider(),
+                      _MetricRow(
+                        label: 'Interior',
+                        rating: 'Excellent',
+                        desc:
+                        'No visible wear; all electronics functioning\nproperly',
+                      ),
+                      _Divider(),
+                      _MetricRow(
+                        label: 'Mechanical',
+                        rating: 'Very Good',
+                        desc:
+                        'Engine runs smooth; brakes recently\nserviced; new tires',
+                      ),
+                    ],
+                  ),
+                ),
+
+                const _SectionCard(
+                  title: 'AI Insights',
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _AiBadge(),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'This vehicle shows excellent maintenance history and is in above-average condition for its age and mileage. '
+                              'The minor exterior scratches are cosmetic and don’t affect structural integrity. Recent brake service and new '
+                              'tires indicate proactive maintenance. Overall, this represents good value with minimal immediate repair needs expected.',
+                          style: TextStyle(color: Color(0xFF111827), height: 1.45),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text(
+                    'Attachments',
+                    style: TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                _CardContainer(
+                  child: Column(
+                    children: [
+                      _AttachmentTile(
+                        name: r.fileName,
+                        size: r.fileType.isNotEmpty ? r.fileType : 'file',
+                        leadingColor: const Color(0xFFEF4444),
+                        icon: Iconsax.document_text,
+                        downloadable: true,
+                        onDownload: () {
+                          if (r.fileUrl.isNotEmpty) {
+                            launchUrlString(r.fileUrl, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        onTap: () {
+                          if (r.fileUrl.isNotEmpty) {
+                            launchUrlString(r.fileUrl, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                      ),
+                      const _Divider(),
+                      const _AttachmentTile(
+                        name: 'Vehicle Photos.zip',
+                        size: '15.2 MB',
+                        leadingColor: Color(0xFF7C3AED),
+                        icon: Iconsax.folder_2,
+                        downloadable: true,
+                        chevron: true,
+                      ),
+                      const _Divider(),
+                      const _AttachmentTile(
+                        name: 'Maintenance History.pdf',
+                        size: '1.1 MB',
+                        leadingColor: Color(0xFF06B6D4),
+                        icon: Iconsax.document_download,
+                        downloadable: true,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ),
+
+      // Bottom actions: Download, Share, Delete
+      bottomNavigationBar: Obx(() {
+        final r = ctrl.report.value;
+        final hasUrl = r != null && r.fileUrl.isNotEmpty;
+
+        return Container(
+          color: Colors.white,
+          padding: EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            12 + MediaQuery.of(context).padding.bottom,
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Generated + status chip
-              Row(
-                children: [
-                  const Text('Generated on Dec 15, 2024',
-                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 12.5)),
-                  const Spacer(),
-                  _Chip(label: 'Valid', color: const Color(0xFF22C55E)),
-                ],
+              SizedBox(
+                height: 52,
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Iconsax.document_download, size: 18),
+                  label: const Text('Download Report',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7C3AED),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                  ),
+                  onPressed: hasUrl
+                      ? () => launchUrlString(r!.fileUrl, mode: LaunchMode.externalApplication)
+                      : null,
+                ),
               ),
               const SizedBox(height: 10),
-
-              // Summary
-              _SectionCard(
-                title: 'Summary',
-                child: Column(
-                  children: const [
-                    _SummaryRow(label: 'Vehicle', value: '2020 Honda Civic LX'),
-                    _Divider(),
-                    _SummaryRow(
-                      label: 'VIN',
-                      value: '2HGFC2F59LH123456',
-                      isLink: true,
-                    ),
-                    _Divider(),
-                    _SummaryRow(label: 'Mileage', value: '45,230 miles'),
-                    _Divider(),
-                    _SummaryRow(label: 'Inspection Date', value: 'Dec 12, 2024'),
-                  ],
-                ),
-              ),
-
-              // Key Metrics
-              _SectionCard(
-                title: 'Key Metrics',
-                child: Column(
-                  children: const [
-                    _MetricOverall(score: '8.5', outOf: '/10'),
-                    _Divider(),
-                    _MetricRow(
-                      label: 'Exterior',
-                      rating: 'Good',
-                      desc:
-                      'Minor scratches on rear bumper; paint in\nexcellent condition',
-                    ),
-                    _Divider(),
-                    _MetricRow(
-                      label: 'Interior',
-                      rating: 'Excellent',
-                      desc:
-                      'No visible wear; all electronics functioning\nproperly',
-                    ),
-                    _Divider(),
-                    _MetricRow(
-                      label: 'Mechanical',
-                      rating: 'Very Good',
-                      desc:
-                      'Engine runs smooth; brakes recently\nserviced; new tires',
-                    ),
-                  ],
-                ),
-              ),
-
-              // AI Insights
-              _SectionCard(
-                title: 'AI Insights',
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1E8FF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Iconsax.cpu, color: Color(0xFF7C3AED), size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'This vehicle shows excellent maintenance history and is in above-'
-                            'average condition for its age and mileage. The minor exterior '
-                            'scratches are cosmetic and don’t affect structural integrity. '
-                            'Recent brake service and new tires indicate proactive maintenance. '
-                            'Overall, this represents good value with minimal immediate repair needs expected.',
-                        style: TextStyle(color: Color(0xFF111827), height: 1.45),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Attachments
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 6),
-                child: Text('Attachments',
+              SizedBox(
+                height: 48,
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Iconsax.share, size: 18, color: Color(0xFF7C3AED)),
+                  label: const Text(
+                    'Share Report',
                     style: TextStyle(
-                        color: Color(0xFF111827),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700)),
-              ),
-              _CardContainer(
-                child: Column(
-                  children: const [
-                    _AttachmentTile(
-                      name: 'Full Inspection Report.pdf',
-                      size: '2.4 MB',
-                      leadingColor: Color(0xFFEF4444),
-                      icon: Iconsax.document_text,
-                      downloadable: true,
+                      color: Color(0xFF7C3AED),
+                      fontWeight: FontWeight.w700,
                     ),
-                    _Divider(),
-                    _AttachmentTile(
-                      name: 'Vehicle Photos.zip',
-                      size: '15.2 MB',
-                      leadingColor: Color(0xFF7C3AED),
-                      icon: Iconsax.folder_2,
-                      downloadable: true,
-                      chevron: true,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF7C3AED)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    _Divider(),
-                    _AttachmentTile(
-                      name: 'Maintenance History.pdf',
-                      size: '1.1 MB',
-                      leadingColor: Color(0xFF06B6D4),
-                      icon: Iconsax.document_download,
-                      downloadable: true,
-                    ),
-                  ],
+                  ),
+                  onPressed: hasUrl
+                      ? () => Share.share(r!.fileUrl, subject: r.fileName)
+                      : null,
                 ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 44,
+                width: double.infinity,
+                child: Obx(() => TextButton.icon(
+                  icon: const Icon(Iconsax.trash, size: 18, color: Color(0xFFEF4444)),
+                  label: Text(
+                    ctrl.deleting.value ? 'Deleting…' : 'Delete Report',
+                    style: const TextStyle(
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: ctrl.deleting.value
+                      ? null
+                      : () => _confirmDelete(context, ctrl),
+                )),
               ),
             ],
           ),
-        ),
-      ),
+        );
+      }),
+    );
+  }
 
-      // Sticky bottom actions
-      bottomNavigationBar: Container(
-        color: Colors.white,
-        padding: EdgeInsets.fromLTRB(
-          16,
-          12,
-          16,
-          12 + MediaQuery.of(context).padding.bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 52,
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Iconsax.document_download, size: 18),
-                label: const Text('Download Report',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7C3AED),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 2,
-                ),
-                onPressed: () {},
-              ),
+  Future<void> _confirmDelete(BuildContext context, ReportDetailController ctrl) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete report?'),
+        content: const Text(
+            'This will remove the report record and try to delete the file. This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
             ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 48,
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: const Icon(Iconsax.share, size: 18, color: Color(0xFF7C3AED)),
-                label: const Text('Share Report',
-                    style: TextStyle(
-                        color: Color(0xFF7C3AED), fontWeight: FontWeight.w700)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF7C3AED)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: () {},
-              ),
-            ),
-          ],
-        ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
+
+    if (ok == true) {
+      await ctrl.deleteReport();
+    }
   }
 }
 
 /* ============================== WIDGETS ============================== */
 
-class _SectionCard extends StatelessWidget {
+class _AiBadge extends StatelessWidget { /* unchanged */
+  const _AiBadge();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1E8FF),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Icon(Iconsax.cpu, color: Color(0xFF7C3AED), size: 20),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget { /* unchanged */
   const _SectionCard({required this.title, required this.child});
   final String title;
   final Widget child;
-
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
@@ -243,25 +365,25 @@ class _SectionCard extends StatelessWidget {
           Container(
             alignment: Alignment.centerLeft,
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-            child: Text(title,
-                style: t.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700, color: const Color(0xFF111827))),
+            child: Text(
+              title,
+              style: t.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF111827),
+              ),
+            ),
           ),
           const _Divider(),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: child,
-          ),
+          Padding(padding: const EdgeInsets.all(12), child: child),
         ],
       ),
     );
   }
 }
 
-class _CardContainer extends StatelessWidget {
+class _CardContainer extends StatelessWidget { /* unchanged */
   const _CardContainer({required this.child});
   final Widget child;
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -275,21 +397,23 @@ class _CardContainer extends StatelessWidget {
   }
 }
 
-class _SummaryRow extends StatelessWidget {
+class _SummaryRow extends StatelessWidget { /* unchanged */
   const _SummaryRow({required this.label, required this.value, this.isLink = false});
   final String label;
   final String value;
   final bool isLink;
-
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Text(label,
-                style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
+            child: Text(
+              label,
+              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13),
+            ),
           ),
           Expanded(
             child: Align(
@@ -297,6 +421,7 @@ class _SummaryRow extends StatelessWidget {
               child: Text(
                 value,
                 textAlign: TextAlign.right,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: isLink ? const Color(0xFF2563EB) : const Color(0xFF111827),
                   fontWeight: isLink ? FontWeight.w700 : FontWeight.w600,
@@ -310,11 +435,10 @@ class _SummaryRow extends StatelessWidget {
   }
 }
 
-class _MetricOverall extends StatelessWidget {
+class _MetricOverall extends StatelessWidget { /* unchanged */
   const _MetricOverall({required this.score, required this.outOf});
   final String score;
   final String outOf;
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -325,11 +449,15 @@ class _MetricOverall extends StatelessWidget {
         ),
         Row(
           children: [
-            Text(score,
-                style: const TextStyle(
-                    color: Color(0xFF7C3AED),
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16)),
+            Text(
+              score,
+              style: const TextStyle(
+                color: Color(0xFF7C3AED),
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(width: 2),
             Text(' $outOf', style: const TextStyle(color: Color(0xFF6B7280))),
           ],
         ),
@@ -338,34 +466,27 @@ class _MetricOverall extends StatelessWidget {
   }
 }
 
-class _MetricRow extends StatelessWidget {
-  const _MetricRow({
-    required this.label,
-    required this.rating,
-    required this.desc,
-  });
-
+class _MetricRow extends StatelessWidget { /* unchanged */
+  const _MetricRow({required this.label, required this.rating, required this.desc});
   final String label;
   final String rating;
   final String desc;
-
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child:
-          Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
+          child: Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13)),
         ),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(rating,
-                  style: const TextStyle(
-                      color: Color(0xFF111827), fontWeight: FontWeight.w700)),
+              Text(
+                rating,
+                style: const TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 2),
               Text(
                 desc,
@@ -380,7 +501,7 @@ class _MetricRow extends StatelessWidget {
   }
 }
 
-class _AttachmentTile extends StatelessWidget {
+class _AttachmentTile extends StatelessWidget { /* unchanged */
   const _AttachmentTile({
     required this.name,
     required this.size,
@@ -388,6 +509,8 @@ class _AttachmentTile extends StatelessWidget {
     required this.icon,
     this.downloadable = false,
     this.chevron = false,
+    this.onTap,
+    this.onDownload,
   });
 
   final String name;
@@ -396,6 +519,8 @@ class _AttachmentTile extends StatelessWidget {
   final IconData icon;
   final bool downloadable;
   final bool chevron;
+  final VoidCallback? onTap;
+  final VoidCallback? onDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -411,16 +536,18 @@ class _AttachmentTile extends StatelessWidget {
         ),
         child: Icon(icon, color: leadingColor, size: 20),
       ),
-      title: Text(name,
-          style: const TextStyle(
-              color: Color(0xFF111827), fontWeight: FontWeight.w600)),
+      title: Text(
+        name,
+        style: const TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w600),
+        overflow: TextOverflow.ellipsis,
+      ),
       subtitle: Text(size, style: const TextStyle(color: Color(0xFF6B7280))),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (downloadable)
             IconButton(
-              onPressed: () {},
+              onPressed: onDownload,
               icon: const Icon(Iconsax.arrow_down_1, size: 18, color: Color(0xFF6B7280)),
               tooltip: 'Download',
             ),
@@ -428,7 +555,7 @@ class _AttachmentTile extends StatelessWidget {
             const Icon(Iconsax.arrow_right_3, size: 18, color: Color(0xFF9CA3AF)),
         ],
       ),
-      onTap: () {},
+      onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
@@ -436,7 +563,6 @@ class _AttachmentTile extends StatelessWidget {
 
 class _Divider extends StatelessWidget {
   const _Divider();
-
   @override
   Widget build(BuildContext context) {
     return const Divider(height: 20, thickness: 1, color: Color(0xFFF0F2F5));
@@ -447,7 +573,6 @@ class _Chip extends StatelessWidget {
   const _Chip({required this.label, required this.color});
   final String label;
   final Color color;
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -464,5 +589,31 @@ class _Chip extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/* ============================== HELPERS ============================== */
+
+String _fmtShortDate(DateTime? d) {
+  if (d == null) return 'Unknown';
+  final m = d.month.toString().padLeft(2, '0');
+  final day = d.day.toString().padLeft(2, '0');
+  return '${d.year}-$m-$day';
+}
+
+String _fmtLongDate(DateTime? d) {
+  if (d == null) return 'Unknown';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return '${months[d.month - 1]} ${d.day}, ${d.year}';
+}
+
+DateTime? _asDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is Timestamp) return value.toDate();
+  try {
+    return DateTime.tryParse(value.toString());
+  } catch (_) {
+    return null;
   }
 }

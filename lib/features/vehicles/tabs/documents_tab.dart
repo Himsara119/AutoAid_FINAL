@@ -6,6 +6,8 @@ import 'package:iconsax/iconsax.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import '../../../app.dart';
+import '../../documents/screens/doc_detail_screen.dart';
 import '../../documents/screens/upload_doc_screen.dart'; // needed for Firebase.app()
 
 // TODO: fix these imports to match your folder structure
@@ -39,6 +41,8 @@ class DocumentsTab extends StatelessWidget {
         },
         icon: const Icon(Iconsax.add),
         label: const Text('Add'),
+        backgroundColor: AppColors.blue,
+        foregroundColor: Colors.white,
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: db
@@ -84,14 +88,12 @@ class DocumentsTab extends StatelessWidget {
                 title: title,
                 subtitle: subtitle,
                 onTap: () {
-                  // TODO: navigate to your Detail screen
-                  // Navigator.push(context, MaterialPageRoute(
-                  //   builder: (_) => DocumentDetailScreen(
-                  //     vehicleId: vehicleId,
-                  //     documentId: d.id,
-                  //   ),
-                  // ));
+                  Get.to(() => DocumentDetailScreen(
+                    vehicleId: vehicleId,
+                    documentId: d.id,
+                  ));
                 },
+
               );
             },
           );

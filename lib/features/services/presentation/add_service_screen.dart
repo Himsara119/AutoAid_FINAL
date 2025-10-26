@@ -281,6 +281,7 @@ class _AddServiceRecordScreenState extends State<AddServiceRecordScreen> {
           child: Form(
             key: _formKey,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Service date
                 const _FieldLabel('Service Date'),

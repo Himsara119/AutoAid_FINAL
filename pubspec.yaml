@@ -23,6 +23,12 @@ dependencies:
   flutter_native_splash: ^2.4.6
   smooth_page_indicator: ^1.2.1
 
+  #PDF
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  path_provider: ^2.1.5
+  open_filex: ^4.7.0
+
 
   #Icons
   iconsax: ^0.0.8
@@ -50,6 +56,11 @@ dependencies:
   image_picker: ^1.2.0
   tflite_flutter: ^0.11.0
   image: ^4.5.4
+  share_plus: ^12.0.1
+
+  #map
+  google_maps_flutter: ^2.13.1
+  geolocator: ^14.0.2
 
 
 dev_dependencies:

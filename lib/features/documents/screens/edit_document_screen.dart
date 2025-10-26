@@ -12,13 +12,10 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
-/// EditDocumentScreen
-/// - Prefills from existing record (passed in) or fetches by id.
-/// - Allows metadata updates.
-/// - Optional: replace file (uploads new, deletes old).
-/// - Writes to: vehicles/{vehicleId}/documents/{documentId} (db='autoaid').
-/// - On success: Get.back(result: 'updated').
+// use the ONE TRUE MODEL
+import '../models/document_model.dart';
 
+/// EditDocumentScreen with fixed bottom action bar (Cancel | Save)
 class EditDocumentScreen extends StatefulWidget {
   const EditDocumentScreen({
     super.key,
@@ -30,7 +27,7 @@ class EditDocumentScreen extends StatefulWidget {
 
   final String vehicleId;
   final String documentId;
-  final DocumentRecord? existing; // optional if you navigated here from detail
+  final DocumentRecord? existing; // optional if navigated from detail
   final String databaseId;
 
   @override
@@ -193,8 +190,10 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
 
       // If a new file is picked, upload it and delete the old one
       if (_newFileName != null && (_newFile != null || _newFileBytes != null)) {
-        final storagePath = 'documents/${widget.vehicleId}/${widget.documentId}/${_newFileName!}';
-        final meta = SettableMetadata(contentType: _newContentType ?? 'application/octet-stream');
+        final storagePath =
+            'documents/${widget.vehicleId}/${widget.documentId}/${_newFileName!}';
+        final meta =
+        SettableMetadata(contentType: _newContentType ?? 'application/octet-stream');
 
         final task = kIsWeb || _newFile == null
             ? _storage.ref(storagePath).putData(_newFileBytes as Uint8List, meta)
@@ -209,9 +208,7 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
           try {
             final oldRef = _storage.refFromURL(_existingFileUrl!);
             await oldRef.delete();
-          } catch (_) {
-            // ignore storage delete failure
-          }
+          } catch (_) {}
         }
 
         fileUrl = newUrl;
@@ -220,7 +217,8 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
         contentType = _newContentType;
       }
 
-      final expired = !_noExpiry && _expiryDate != null && _expiryDate!.isBefore(DateTime.now());
+      final expired =
+          !_noExpiry && _expiryDate != null && _expiryDate!.isBefore(DateTime.now());
       final status = expired ? 'expired' : 'active';
 
       final data = <String, dynamic>{
@@ -229,7 +227,8 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
         'number': _numberCtrl.text.trim().isEmpty ? null : _numberCtrl.text.trim(),
         'issuer': _issuerCtrl.text.trim().isEmpty ? null : _issuerCtrl.text.trim(),
         'issue_date': _issueDate == null ? null : Timestamp.fromDate(_issueDate!),
-        'expiry_date': _noExpiry || _expiryDate == null ? null : Timestamp.fromDate(_expiryDate!),
+        'expiry_date':
+        _noExpiry || _expiryDate == null ? null : Timestamp.fromDate(_expiryDate!),
         'no_expiry': _noExpiry,
         'notes': _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
         'file_url': fileUrl,
@@ -239,7 +238,7 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
         'status': status,
         'updated_at': now,
         if (uid != null) 'updated_by': 'users/$uid',
-        'vehicle_id': widget.vehicleId, // keep for analytics/debug parity
+        'vehicle_id': widget.vehicleId,
       };
 
       await docRef.set(data, SetOptions(merge: true));
@@ -280,7 +279,8 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
   String _d(DateTime? dt) => dt == null ? 'Not set' : DateFormat.yMMMd().format(dt);
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -292,22 +292,19 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Document'),
-        actions: [
-          TextButton.icon(
-            onPressed: _saving ? null : _save,
-            icon: const Icon(Iconsax.save_2),
-            label: const Text('Save'),
-          ),
-        ],
+      appBar: AppBar(title: const Text('Edit Document')),
+      bottomNavigationBar: _BottomActionBar(
+        primaryLabel: _saving ? 'Saving…' : 'Save',
+        secondaryLabel: 'Cancel',
+        onPrimary: _saving ? null : _save,
+        onSecondary: _saving ? null : () => Get.back(),
       ),
       body: AbsorbPointer(
         absorbing: _saving,
         child: Form(
           key: _form,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
             children: [
               const _Section('Type'),
               const SizedBox(height: 8),
@@ -416,18 +413,6 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
-
-              const SizedBox(height: 28),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: _saving ? null : _save,
-                  icon: _saving
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Iconsax.save_2),
-                  label: Text(_saving ? 'Saving…' : 'Save Changes'),
-                ),
-              ),
             ],
           ),
         ),
@@ -436,78 +421,80 @@ class _EditDocumentScreenState extends State<EditDocumentScreen> {
   }
 }
 
-/* ============================== Shared model ============================== */
+/* ============================== Bottom action bar ============================== */
 
-class DocumentRecord {
-  final String id;
-  final String type;
-  final String name;
-  final String? number;
-  final String? issuer;
-  final DateTime? issueDate;
-  final DateTime? expiryDate;
-  final bool noExpiry;
-  final String? notes;
-  final String? fileUrl;
-  final String? fileName;
-  final int? fileSize;
-  final String? contentType;
-  final String status;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-
-  DocumentRecord({
-    required this.id,
-    required this.type,
-    required this.name,
-    required this.number,
-    required this.issuer,
-    required this.issueDate,
-    required this.expiryDate,
-    required this.noExpiry,
-    required this.notes,
-    required this.fileUrl,
-    required this.fileName,
-    required this.fileSize,
-    required this.contentType,
-    required this.status,
-    required this.createdAt,
-    required this.updatedAt,
+class _BottomActionBar extends StatelessWidget {
+  const _BottomActionBar({
+    required this.primaryLabel,
+    required this.secondaryLabel,
+    required this.onPrimary,
+    required this.onSecondary,
   });
 
-  static DocumentRecord fromSnap(DocumentSnapshot<Map<String, dynamic>> d) {
-    final x = d.data() ?? <String, dynamic>{};
-    String status = (x['status'] ?? 'active') as String;
-    final noExpiry = (x['no_expiry'] ?? false) as bool;
-    final expiryTs = x['expiry_date'] as Timestamp?;
-    final expiry = expiryTs?.toDate();
+  final String primaryLabel;   // filled right
+  final String secondaryLabel; // outlined left
+  final VoidCallback? onPrimary;
+  final VoidCallback? onSecondary;
 
-    if (!noExpiry && expiry != null && expiry.isBefore(DateTime.now())) {
-      status = 'expired';
-    }
-
-    return DocumentRecord(
-      id: d.id,
-      type: (x['type'] ?? 'other').toString(),
-      name: (x['name'] ?? '').toString(),
-      number: x['number'] as String?,
-      issuer: x['issuer'] as String?,
-      issueDate: (x['issue_date'] as Timestamp?)?.toDate(),
-      expiryDate: expiry,
-      noExpiry: noExpiry,
-      notes: x['notes'] as String?,
-      fileUrl: x['file_url'] as String?,
-      fileName: x['file_name'] as String?,
-      fileSize: (x['file_size'] is int) ? x['file_size'] as int : null,
-      contentType: x['content_type'] as String?,
-      status: status,
-      createdAt: ((x['created_at'] as Timestamp?)?.toDate()) ?? DateTime.now(),
-      updatedAt: ((x['updated_at'] as Timestamp?)?.toDate()) ?? DateTime.now(),
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme;
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 56,
+                child: OutlinedButton(
+                  onPressed: onSecondary,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: c.primary.withOpacity(0.35)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    foregroundColor: c.primary,
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  ),
+                  child: Text(secondaryLabel, overflow: TextOverflow.ellipsis),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: SizedBox(
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: onPrimary,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: c.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  ),
+                  child: Text(primaryLabel, overflow: TextOverflow.ellipsis),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-/* ============================== UI bits ============================== */
+/* ============================== UI helpers ============================== */
 
 class _Section extends StatelessWidget {
   const _Section(this.title);
@@ -582,8 +569,7 @@ class _ExistingFileRow extends StatelessWidget {
 
   String _fmtSize(int? s) {
     if (s == null) return '';
-    const kb = 1024;
-    const mb = 1024 * 1024;
+    const kb = 1024, mb = 1024 * 1024;
     if (s >= mb) return '${(s / mb).toStringAsFixed(1)} MB';
     if (s >= kb) return '${(s / kb).toStringAsFixed(1)} KB';
     return '$s B';
@@ -615,8 +601,12 @@ class _ExistingFileRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(fileName ?? 'No file on record', maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(
+                  fileName ?? 'No file on record',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   [
@@ -649,8 +639,7 @@ class _NewFilePickerRow extends StatelessWidget {
 
   String _fmtSize(int? s) {
     if (s == null) return '';
-    const kb = 1024;
-    const mb = 1024 * 1024;
+    const kb = 1024, mb = 1024 * 1024;
     if (s >= mb) return '${(s / mb).toStringAsFixed(1)} MB';
     if (s >= kb) return '${(s / kb).toStringAsFixed(1)} KB';
     return '$s B';
@@ -680,12 +669,17 @@ class _NewFilePickerRow extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: fileName == null
-                ? const Text('No replacement selected', style: TextStyle(color: Colors.black54))
+                ? const Text('No replacement selected',
+                style: TextStyle(color: Colors.black54))
                 : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(fileName!, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(
+                  fileName!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   [
@@ -698,15 +692,13 @@ class _NewFilePickerRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          TextButton.icon(onPressed: onPick, icon: const Icon(Iconsax.add), label: const Text('Replace')),
+          TextButton.icon(
+            onPressed: onPick,
+            icon: const Icon(Iconsax.add),
+            label: const Text('Replace'),
+          ),
         ],
       ),
     );
   }
-}
-
-/* ============================== Doc model used above ============================== */
-
-class DocumentRecordMinimal {
-  // placeholder if you want a slimmer model; not used here.
 }

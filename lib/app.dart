@@ -30,6 +30,9 @@ import 'features/reports/screens/report_builder_screen.dart';
 import 'features/reports/screens/report_preview_screen.dart';
 import 'features/shell/app_shell.dart';
 
+// Reports UI (detail screen)
+import 'features/reports/screens/report_builder_screen.dart';
+
 // Controller for binding
 import 'features/vehicles/controllers/vehicle_detail_controller.dart';
 
@@ -61,13 +64,14 @@ class App extends StatelessWidget {
           headlineMedium: TextStyle(fontWeight: FontWeight.w700, fontSize: 26),
           titleLarge: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
           titleMedium: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-          bodyMedium: TextStyle(fontWeight: FontWeight.w400, fontSize: 14, height: 1.4),
+          bodyMedium:
+          TextStyle(fontWeight: FontWeight.w400, fontSize: 14, height: 1.4),
           labelLarge: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
       ),
 
       // Do NOT start on a route that needs params
-      initialRoute: Routes.vehiclelist,
+      initialRoute: Routes.app,
 
       getPages: AppPages.pages,
     );
@@ -93,7 +97,7 @@ class Routes {
   static const reportScreen = '/reportScreen';
   static const serviceDetail = '/serviceDetail';
 
-  //Randiya UI's To Call
+  // Randiya UI's To Call
   static const about = '/about';
   static const profileEdit = '/profileEdit';
   static const helpscreen = '/helpscreen';
@@ -108,15 +112,16 @@ class AppPages {
       transition: Transition.cupertino,
     ),
 
-    // Service detail REQUIRES vehicleId + serviceId. No const. Pull from params/args.
+    // Service detail REQUIRES vehicleId + serviceId.
     GetPage(
       name: Routes.serviceDetail,
       page: () {
-        // Support either /serviceDetail?vehicleId=...&serviceId=... or Get.toNamed(..., arguments:{...})
         final p = Get.parameters;
         final a = Get.arguments;
-        final vehicleId = p['vehicleId'] ?? (a is Map ? a['vehicleId'] as String? : null);
-        final serviceId = p['serviceId'] ?? (a is Map ? a['serviceId'] as String? : null);
+        final vehicleId =
+            p['vehicleId'] ?? (a is Map ? a['vehicleId'] as String? : null);
+        final serviceId =
+            p['serviceId'] ?? (a is Map ? a['serviceId'] as String? : null);
 
         assert(vehicleId != null && vehicleId!.isNotEmpty, 'vehicleId is required');
         assert(serviceId != null && serviceId!.isNotEmpty, 'serviceId is required');
@@ -129,9 +134,28 @@ class AppPages {
       transition: Transition.cupertino,
     ),
 
+    // Condition Report screen: requires vehicleId + reportId
     GetPage(
       name: Routes.reportScreen,
-      page: () => const ConditionReportScreen(),
+      page: () {
+        final p = Get.parameters;
+        final a = Get.arguments;
+
+        final String? vehicleId =
+            p['vehicleId'] ?? (a is Map ? a['vehicleId'] as String? : null);
+        final String? reportId =
+            p['reportId'] ?? (a is Map ? a['reportId'] as String? : null);
+
+        assert(vehicleId != null && vehicleId!.isNotEmpty,
+        'vehicleId is required for ConditionReportScreen');
+        assert(reportId != null && reportId!.isNotEmpty,
+        'reportId is required for ConditionReportScreen');
+
+        return ConditionReportScreen(
+          vehicleId: vehicleId!,
+          reportId: reportId!,
+        );
+      },
       transition: Transition.cupertino,
     ),
 
@@ -199,7 +223,7 @@ class AppPages {
       transition: Transition.cupertino,
     ),
 
-    // Note: you had addVehicle -> VehiclesScreen. Keeping it unchanged per your comment.
+    // Alias used previously; leaving as-is per your setup.
     GetPage(
       name: Routes.addVehicle,
       page: () => const VehiclesScreen(),
@@ -214,18 +238,33 @@ class AppPages {
       transition: Transition.cupertino,
     ),
 
+    // Report Builder: vehicleId is OPTIONAL. If null, the screen shows a picker.
     GetPage(
       name: Routes.reportBuilder,
-      page: () => const ReportBuilderScreen(),
+      page: () {
+        final p = Get.parameters;
+        final a = Get.arguments;
+
+        // Supports:
+        //   /report-builder?vehicleId=...
+        //   Get.toNamed(..., arguments: {'vehicleId': '...'})
+        //   Get.toNamed(..., arguments: null)  // open with picker
+        final String? vehicleId =
+            p['vehicleId'] ?? (a is Map ? a['vehicleId'] as String? : a as String?);
+
+        // No assert: allow null and let the UI handle selection.
+        return ReportBuilderScreen(vehicleId: vehicleId);
+      },
       transition: Transition.cupertino,
     ),
+
     GetPage(
       name: Routes.mechanicFinder,
       page: () => const FindMechanicScreen(),
       transition: Transition.cupertino,
     ),
 
-    // Alias to the same AI chat screen; bind it too so it never crashes.
+    // Alias to the same AI chat screen; bind it too.
     GetPage(
       name: Routes.aiScreen,
       page: () => const AiDiagnosisChatScreen(),
@@ -239,6 +278,7 @@ class AppPages {
 
 class AppColors {
   static const blue = Color(0xFF2563EB);
+  static const purple = Color(0xFF800080);
   static const blueLight = Color(0xFFEFF4FF);
   static const tileBg = Color(0xFFFFFFFF);
   static const border = Color(0xFFE6E8ED);

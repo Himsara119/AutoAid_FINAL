@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
+import '../../../app.dart';
 import '../../services/presentation/add_service_screen.dart';
 import '../../services/presentation/service_detail_screen.dart';
 import '../controllers/service_records_controller.dart';
@@ -82,6 +83,8 @@ class ServiceHistoryTab extends StatelessWidget {
           child: FloatingActionButton.extended(
             icon: const Icon(Iconsax.add),
             label: const Text('Add'),
+            backgroundColor: AppColors.blue,
+            foregroundColor: Colors.white,
             onPressed: () => Get.to(() => AddServiceRecordScreen(vehicleId: vehicleId)),
           ),
         ),

@@ -202,7 +202,7 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
                 DocumentsTab(
                   vehicleId: controller.id, // controller.id was set via Get.put(VehicleDetailController(id))
                 ),
-                const ReportsTab(),
+                ReportsTab(vehicleId: controller.id),
               ],
             );
           }),

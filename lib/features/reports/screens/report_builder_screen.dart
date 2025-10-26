@@ -1,24 +1,67 @@
 // lib/features/reports/ui/report_builder_screen.dart
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path_provider/path_provider.dart';
+
+import 'package:finalapp/features/reports/screens/report_export_service.dart';
+import '../../../data/repositories/report_repository.dart';
+import '../../reports/models/report_entity.dart';
+
+/// Report Builder: lets user pick sections and generate a PDF report.
+/// If [vehicleId] is provided via route, the picker is locked to that car.
+/// If null, user can pick a car from a bottom sheet.
 class ReportBuilderScreen extends StatefulWidget {
-  const ReportBuilderScreen({super.key});
+  const ReportBuilderScreen({
+    super.key,
+    this.vehicleId,
+  });
+
+  final String? vehicleId;
 
   @override
   State<ReportBuilderScreen> createState() => _ReportBuilderScreenState();
 }
 
 class _ReportBuilderScreenState extends State<ReportBuilderScreen> {
-  String? _selectedVehicle;
-  String _format = 'PDF Document';
+  // Firestore (named database: autoaid)
+  final FirebaseFirestore _db = FirebaseFirestore.instanceFor(
+    app: Firebase.app(),
+    databaseId: 'autoaid',
+  );
 
-  final Map<String, bool> _sections = {
+  String? _selectedVehicleId;
+  String? _selectedVehicleLabel; // UI only
+  late final bool _locked;       // true if coming from a specific vehicle
+
+  String _format = 'PDF Document';
+  bool _busy = false;
+
+  final Map<String, bool> _sections = <String, bool>{
     'Overview': true,
     'Service History': true,
     'Documents': false,
     'AI Report': true,
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedVehicleId = widget.vehicleId;
+    _locked = widget.vehicleId != null && widget.vehicleId!.isNotEmpty;
+    _selectedVehicleLabel = _locked ? '(${_shortId(widget.vehicleId!)})' : null;
+  }
+
+  // Shrink long Firestore ids
+  String _shortId(String id, {int head = 6}) =>
+      id.length <= head ? id : '${id.substring(0, head)}…';
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +95,7 @@ class _ReportBuilderScreenState extends State<ReportBuilderScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header icon + title
+              // Header
               Center(
                 child: Column(
                   children: [
@@ -79,58 +122,77 @@ class _ReportBuilderScreenState extends State<ReportBuilderScreen> {
               ),
               const SizedBox(height: 26),
 
-              Text('Report Sections',
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text('Report Sections', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 14),
 
               const Text('Vehicle',
                   style: TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w500)),
               const SizedBox(height: 6),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE6E8ED)),
-                ),
-                child: DropdownButtonFormField<String>(
-                  value: _selectedVehicle,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+
+              // Vehicle selector tile: locked if vehicleId was provided via route
+              InkWell(
+                onTap: _locked ? null : _openVehiclePicker,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE6E8ED)),
                   ),
-                  hint: const Text('Select vehicle'),
-                  icon: const Icon(Iconsax.arrow_down_1),
-                  items: const [
-                    DropdownMenuItem(value: 'Toyota RAV4', child: Text('Toyota RAV4')),
-                    DropdownMenuItem(value: 'Honda Civic', child: Text('Honda Civic')),
-                    DropdownMenuItem(value: 'Mazda CX-5', child: Text('Mazda CX-5')),
-                  ],
-                  onChanged: (v) => setState(() => _selectedVehicle = v),
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    leading: const Icon(Iconsax.car, color: Color(0xFF111827), size: 20),
+                    title: const Text(
+                      'Selected vehicle',
+                      style: TextStyle(color: Color(0xFF6B7280), fontSize: 12.5),
+                    ),
+                    subtitle: Text(
+                      _selectedVehicleLabel ??
+                          (_selectedVehicleId != null
+                              ? '(${_shortId(_selectedVehicleId!)})'
+                              : 'Tap to choose a vehicle'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: _selectedVehicleId == null ? const Color(0xFF9CA3AF) : const Color(0xFF111827),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    trailing: Icon(
+                      _locked ? Iconsax.lock : Iconsax.arrow_down_1,
+                      size: 18,
+                      color: const Color(0xFF9CA3AF),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
 
-              ..._sections.entries.map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _SectionTile(
-                  title: e.key,
-                  subtitle: _subtitleFor(e.key),
-                  icon: _iconFor(e.key),
-                  iconBg: _colorFor(e.key),
-                  value: e.value,
-                  onChanged: (v) => setState(() => _sections[e.key] = v),
+              // Section toggles
+              ..._sections.entries.map(
+                    (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _SectionTile(
+                    title: e.key,
+                    subtitle: _subtitleFor(e.key),
+                    icon: _iconFor(e.key),
+                    iconBg: _colorFor(e.key),
+                    value: e.value,
+                    onChanged: (v) => setState(() => _sections[e.key] = v),
+                  ),
                 ),
-              )),
+              ),
 
               const SizedBox(height: 20),
 
-              Text('Report Options',
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text('Report Options', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 10),
 
               const Text('Format',
                   style: TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w500)),
               const SizedBox(height: 6),
+
+              // Format dropdown
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -154,8 +216,7 @@ class _ReportBuilderScreenState extends State<ReportBuilderScreen> {
 
               const SizedBox(height: 22),
 
-              Text('Report Summary',
-                  style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text('Report Summary', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
 
               Text(
@@ -169,19 +230,23 @@ class _ReportBuilderScreenState extends State<ReportBuilderScreen> {
                 runSpacing: 6,
                 children: _sections.entries
                     .where((e) => e.value)
-                    .map((e) => Chip(
-                  label: Text(e.key),
-                  labelStyle: const TextStyle(
-                      color: Color(0xFF7C3AED), fontWeight: FontWeight.w600),
-                  backgroundColor: const Color(0xFFF1E8FF),
-                ))
+                    .map(
+                      (e) => Chip(
+                    label: Text(e.key),
+                    labelStyle: const TextStyle(color: Color(0xFF7C3AED), fontWeight: FontWeight.w600),
+                    backgroundColor: const Color(0xFFF1E8FF),
+                  ),
+                )
                     .toList(),
               ),
               const SizedBox(height: 20),
 
               Center(
                 child: Text(
-                  'Report will be generated and sent to your email',
+                  // Clarify where to see it afterwards
+                  'Report will be generated and sent to your email,\n'
+                      'and will appear under that vehicle\'s Reports tab.',
+                  textAlign: TextAlign.center,
                   style: t.bodySmall?.copyWith(color: const Color(0xFF9CA3AF)),
                 ),
               ),
@@ -189,6 +254,8 @@ class _ReportBuilderScreenState extends State<ReportBuilderScreen> {
           ),
         ),
       ),
+
+      // CTA
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: SizedBox(
@@ -202,12 +269,179 @@ class _ReportBuilderScreenState extends State<ReportBuilderScreen> {
               elevation: 4,
               shadowColor: const Color(0xFF7C3AED).withOpacity(0.3),
             ),
-            onPressed: () {},
-            child: const Text('Generate Report',
+            onPressed: _busy || _selectedVehicleId == null ? null : _onGenerate,
+            child: _busy
+                ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            )
+                : const Text('Generate Report',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
           ),
         ),
       ),
+    );
+  }
+
+  /* --------------------------- Actions ---------------------------- */
+
+  Future<void> _onGenerate() async {
+    if (_format != 'PDF Document') {
+      _snack('Only PDF is supported right now.');
+      return;
+    }
+    if (_selectedVehicleId == null || _selectedVehicleId!.isEmpty) {
+      _snack('Pick a vehicle first.');
+      return;
+    }
+
+    final selectedSections =
+    _sections.entries.where((e) => e.value).map((e) => e.key).toList();
+    if (selectedSections.isEmpty) {
+      _snack('Pick at least one section.');
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      // 1) Build the PDF bytes
+      final Uint8List bytes = await ReportExportService().buildPdf(
+        vehicleId: _selectedVehicleId!,
+        sections: selectedSections,
+      );
+
+      // 2) Save temp file and upload to Firebase Storage
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'condition_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final filePath = '${tempDir.path}/$fileName';
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      final storageRef =
+      FirebaseStorage.instance.ref().child('reports/${_selectedVehicleId!}/$fileName');
+      await storageRef.putFile(file);
+      final downloadUrl = await storageRef.getDownloadURL();
+
+      // 3) Persist metadata in Firestore using your repo (server timestamps)
+      final data = ReportModel.createWriteMap(
+        dealershipId: 'default', // TODO: source from auth/profile
+        vehicleId: _selectedVehicleId!,
+        category: 'condition',
+        fileName: fileName,
+        fileUrl: downloadUrl,
+        fileType: 'application/pdf',
+        notes: 'Sections: ${selectedSections.join(", ")}',
+      );
+
+      final repo = ReportRepo();
+      await repo.create(_selectedVehicleId!, data);
+
+      // Success: tell them where to go; stay on this screen
+      _snack(
+        'Report created. Please go to the specific vehicle to view it in Reports.',
+        seconds: 5,
+      );
+
+      // No navigation here on purpose.
+      // If you later want to close the screen: Navigator.of(context).maybePop();
+    } catch (e) {
+      _snack('Failed to generate: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _snack(String msg, {int seconds = 3}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: seconds),
+      ),
+    );
+  }
+
+  /* --------------------------- Vehicle Picker ---------------------------- */
+
+  void _openVehiclePicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                height: 4,
+                width: 44,
+                margin: const EdgeInsets.only(top: 8, bottom: 12),
+                decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(2)),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Select vehicle', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _db
+                      .collection('vehicles')
+                      .where('deleted', isEqualTo: false)
+                      .orderBy('make')
+                      .snapshots(),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snap.hasError) {
+                      return Center(child: Text('Error: ${snap.error}'));
+                    }
+                    final docs = snap.data?.docs ?? const [];
+                    if (docs.isEmpty) {
+                      return const Center(child: Text('No vehicles found.'));
+                    }
+                    return ListView.separated(
+                      itemCount: docs.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, i) {
+                        final d = docs[i];
+                        final id = d.id;
+                        final make = (d.data()['make'] ?? '').toString();
+                        final model = (d.data()['model'] ?? '').toString();
+                        final year = (d.data()['year'] ?? '').toString();
+                        final label = [year, make, model].where((x) => x.isNotEmpty).join(' ');
+                        return ListTile(
+                          leading: const Icon(Icons.directions_car_outlined),
+                          title: Text(label.isEmpty ? id : label),
+                          subtitle: Text(id),
+                          onTap: () {
+                            setState(() {
+                              _selectedVehicleId = id;
+                              _selectedVehicleLabel = label.isEmpty ? '(${_shortId(id)})' : label;
+                            });
+                            Navigator.of(context).pop();
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -301,8 +535,7 @@ class _SectionTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600, height: 1.3)),
+                Text(title, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600, height: 1.3)),
                 Text(subtitle, style: t.bodySmall?.copyWith(color: const Color(0xFF6B7280))),
               ],
             ),

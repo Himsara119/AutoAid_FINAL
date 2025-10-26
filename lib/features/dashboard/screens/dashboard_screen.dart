@@ -16,7 +16,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -151,7 +150,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     icon: Iconsax.document_text,
                     title: 'Generate Report',
                     subtitle: 'Create analysis',
-                    onTap: () => Get.toNamed(Routes.reportBuilder, preventDuplicates: true),
+                    // IMPORTANT: Open Report Builder unlocked with no preselected vehicle.
+                    // If later you have a known id, pass: arguments: {'vehicleId': someVehicleId}
+                    onTap: () => Get.toNamed(
+                      Routes.reportBuilder,
+                      arguments: {'vehicleId': null},
+                      preventDuplicates: true,
+                    ),
                   ),
                   QuickActionCard(
                     iconBg: const Color(0xFFFFF7E8),

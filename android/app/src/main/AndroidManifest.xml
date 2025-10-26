@@ -53,7 +53,7 @@
         <!-- Google Maps (optional; replace key) -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyDtxWqJPvteV-lST9A7E1qYASfz-PDYvRU" />
+            android:value="AIzaSyC2SN8W8fprjB2330qpzhNlthfXRf_JtWE" />
     </application>
 
     <!-- Package visibility (Flutter text plugin) -->
