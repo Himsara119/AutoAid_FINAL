@@ -10,6 +10,7 @@ import '../models/report_entity.dart';
 /// 2) Unbound mode: construct empty -> call setVehicle(id) later
 class ReportListController extends GetxController {
   String? _vehicleId;
+
   String? get vehicleId => _vehicleId;
 
   /// Firestore (named DB: autoaid)
@@ -62,7 +63,9 @@ class ReportListController extends GetxController {
         .orderBy('uploaded_at', descending: true)
         .snapshots()
         .listen((snapshot) {
-      final list = snapshot.docs.map((doc) => ReportModel.fromDoc(doc)).toList();
+      final list = snapshot.docs
+          .map((doc) => ReportModel.fromDoc(doc))
+          .toList();
       items.assignAll(list);
       loading.value = false;
     }, onError: (e) {
