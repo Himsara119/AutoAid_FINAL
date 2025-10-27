@@ -16,7 +16,7 @@ class ReportListTile extends StatelessWidget {
     required this.report,
     this.status,           // optional UI chip (e.g., "Completed")
     this.onTap,            // navigate to detail
-    this.trailing,         // custom trailing if you want
+    this.trailing         // custom trailing if you want
   });
 
   final ReportModel report;
