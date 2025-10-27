@@ -1,10 +1,12 @@
 // lib/features/vehicles/ui/vehicle_details_screen.dart
+import 'dart:async';
 import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 
+import '../../documents/controllers/documents_controller.dart';
 import '../controllers/vehicle_detail_controller.dart';
 import '../models/vehicle_model.dart';
 
@@ -15,24 +17,66 @@ import '../tabs/reports_tab.dart';
 import '../tabs/service_tab.dart';
 import 'edit_vehicle_screen.dart';
 
-class VehicleDetailsScreen extends GetView<VehicleDetailController> {
+// Notifications screen
+import '../../notifications/screens/notifications_screen.dart';
+
+class VehicleDetailsScreen extends StatefulWidget {
   const VehicleDetailsScreen({super.key});
 
+  @override
+  State<VehicleDetailsScreen> createState() => _VehicleDetailsScreenState();
+}
+
+class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
+  late final VehicleDetailController controller;
+
+  // --- mirroring bits ---
+  DocumentController? _docsCtl;
+  StreamSubscription? _docsSub;
+
   void _d(String msg, {Object? err, StackTrace? st}) {
-    if (kDebugMode) dev.log(msg, name: 'VehicleDetailsScreen', error: err, stackTrace: st);
+    if (kDebugMode) {
+      dev.log(msg, name: 'VehicleDetailsScreen', error: err, stackTrace: st);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Ensure controller is bound with a concrete vehicle id (same logic as before)
+    final id = Get.parameters['id'] ?? (Get.arguments as String?);
+    assert(id != null && id!.isNotEmpty, 'No vehicle id provided for VehicleDetailsScreen');
+
+    // Bind the vehicle detail controller once
+    if (!Get.isRegistered<VehicleDetailController>()) {
+      Get.put(VehicleDetailController(id!));
+      _d('Guard bound VehicleDetailController(id=$id)');
+    }
+    controller = Get.find<VehicleDetailController>();
+
+    // ---------- START MIRRORING DOCUMENTS -> NOTIFICATIONS ----------
+    // Put a per-vehicle DocumentController and subscribe to its stream.
+    // The stream side-effect mirrors document expiry alerts into notifications.
+    _docsCtl = Get.put(DocumentController(controller.id), tag: 'docs_${controller.id}', permanent: true);
+    _docsSub = _docsCtl!.stream.listen(
+          (_) {},
+      onError: (e, st) => _d('Document mirroring stream error', err: e, st: st),
+    );
+    // ---------------------------------------------------------------
+  }
+
+  @override
+  void dispose() {
+    _docsSub?.cancel();
+    _docsSub = null;
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
     final divider = Theme.of(context).dividerColor;
-
-    if (!Get.isRegistered<VehicleDetailController>()) {
-      final id = Get.parameters['id'] ?? (Get.arguments as String?);
-      assert(id != null && id!.isNotEmpty, 'No vehicle id provided for VehicleDetailsScreen');
-      Get.put(VehicleDetailController(id!));
-      _d('Guard bound VehicleDetailController(id=$id)');
-    }
 
     _d('build()');
 
@@ -68,6 +112,22 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
                     ),
                   ),
                   const Spacer(),
+
+                  // Per-vehicle notifications
+                  IconButton(
+                    tooltip: 'Vehicle notifications',
+                    icon: const Icon(Iconsax.notification),
+                    onPressed: () {
+                      final vid = controller.id;
+                      _d('Open notifications tapped (vehicleId=$vid)');
+                      Get.to(() => NotificationsScreen(
+                        vehicleId: controller.id,
+                        title: 'Notifications',
+                      ));
+                    },
+                  ),
+
+                  // Optional: quick reload
                   IconButton(
                     tooltip: 'Reload',
                     onPressed: () {
@@ -76,9 +136,33 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
                     },
                     icon: const Icon(Iconsax.refresh),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.only(right: 6),
-                    child: Icon(Iconsax.more),
+
+                  // Optional overflow: jump to global notifications (no vehicle filter)
+                  PopupMenuButton<String>(
+                    tooltip: 'More',
+                    icon: const Icon(Iconsax.more),
+                    onSelected: (v) {
+                      if (v == 'all_notifications') {
+                        _d('Open global notifications (collectionGroup feed)');
+                        Get.to(() => const NotificationsScreen(
+                          title: 'Notifications',
+                          // no vehicleId → global feed, ensure your feed controller supports this path
+                        ));
+                      } else if (v == 'edit') {
+                        _d('Edit vehicle pressed');
+                        Get.to(() => EditVehicleScreen(vehicleId: controller.id));
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'all_notifications',
+                        child: Text('All notifications'),
+                      ),
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Edit vehicle'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -88,7 +172,7 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
               ),
             ),
 
-            // IMAGE HERO: now reads from Firestore (primary_photo / photos[])
+            // IMAGE HERO
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -102,7 +186,6 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
                   final v = controller.vehicle.value;
                   if (v == null) return const _ImagePlaceholder();
 
-                  // Defensive reads: support either primaryPhoto or photos[0]
                   final List<String> photos = _extractPhotos(v);
                   if (photos.isEmpty) return const _ImagePlaceholder();
 
@@ -111,6 +194,7 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
               ),
             ),
 
+            // HEADER SUMMARY
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
@@ -121,7 +205,8 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
                   }
                   if (controller.error.value != null) {
                     _d('header: error → ${controller.error.value}');
-                    return Text(controller.error.value!, style: const TextStyle(color: Colors.red));
+                    return Text(controller.error.value!,
+                        style: const TextStyle(color: Colors.red));
                   }
 
                   final VehicleModel v = controller.vehicle.value!;
@@ -158,6 +243,7 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
               ),
             ),
 
+            // TABS HEADER
             SliverPersistentHeader(
               pinned: true,
               delegate: _TabsHeaderDelegate(
@@ -199,9 +285,7 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
               children: [
                 const OverviewTab(),
                 const ServiceHistoryTab(),
-                DocumentsTab(
-                  vehicleId: controller.id, // controller.id was set via Get.put(VehicleDetailController(id))
-                ),
+                DocumentsTab(vehicleId: controller.id),
                 ReportsTab(vehicleId: controller.id),
               ],
             );
@@ -217,9 +301,11 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
 
     // preferred: a photos array
     try {
-      final p = v.photos; // if your model has `List<String> photos`
+      final p = v.photos;
       if (p != null) {
-        urls.addAll(p.where((e) => e is String && e.toString().trim().isNotEmpty).cast<String>());
+        urls.addAll(
+          p.where((e) => e is String && e.toString().trim().isNotEmpty).cast<String>(),
+        );
       }
     } catch (_) {}
 
@@ -231,7 +317,7 @@ class VehicleDetailsScreen extends GetView<VehicleDetailController> {
       }
     } catch (_) {}
 
-    // tertiary: map lookups, if your model exposes raw map
+    // tertiary: raw map lookups
     try {
       final raw = (v as dynamic).raw as Map<String, dynamic>?;
       if (raw != null) {
@@ -287,7 +373,6 @@ class _ErrorCard extends StatelessWidget {
   }
 }
 
-/// Shown if no images exist in Firestore.
 class _ImagePlaceholder extends StatelessWidget {
   const _ImagePlaceholder();
 
@@ -316,7 +401,6 @@ class _ImagePlaceholder extends StatelessWidget {
   }
 }
 
-/// Simple swipeable hero gallery with page dots.
 class _HeroGallery extends StatefulWidget {
   const _HeroGallery({required this.urls});
   final List<String> urls;
@@ -351,7 +435,6 @@ class _HeroGalleryState extends State<_HeroGallery> {
               onPageChanged: (i) => setState(() => _index = i),
               itemBuilder: (context, i) {
                 final u = urls[i];
-                // Keep it standard: Image.network handles your Firebase Storage URLs.
                 return Image.network(
                   u,
                   fit: BoxFit.cover,

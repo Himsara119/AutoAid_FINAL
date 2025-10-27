@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Represents a generated or uploaded report linked to a vehicle.
-/// Use this model primarily for READS. For CREATES, prefer [createWriteMap]
-/// to send server timestamps and avoid client clock issues.
+///
+/// Use [createWriteMap] for creates (server timestamps).
+/// Use [toJson] for partial updates/patches (no forced timestamps).
 class ReportModel {
   final String id;
   final String dealershipId;
@@ -17,11 +18,11 @@ class ReportModel {
   final String fileType; // application/pdf, image/png, etc.
   final String? notes;
 
-  /// Derived from Firestore (uploaded_at/created_at)
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
+  /// Stored in-memory as DateTime for convenience.
+  final DateTime? createdAt; // firestore fields: uploaded_at / created_at
+  final DateTime? updatedAt; // firestore field:  updated_at
 
-  ReportModel({
+  const ReportModel({
     required this.id,
     required this.dealershipId,
     required this.vehicleId,
@@ -55,7 +56,7 @@ class ReportModel {
     );
   }
 
-  /// If you have raw map + id.
+  /// If you have a raw map + id (e.g., from a converter or cache).
   factory ReportModel.fromMap(String id, Map<String, dynamic> data) {
     return ReportModel(
       id: id,
@@ -74,8 +75,8 @@ class ReportModel {
 
   /* ----------------------------- WRITES ----------------------------- */
 
-  /// For PATCH/UPDATEs where you control which fields to send.
-  /// Intentionally does NOT force server timestamps.
+  /// For PATCH/UPDATE where you control exactly what to send.
+  /// Does NOT force server timestamps.
   Map<String, dynamic> toJson() {
     return {
       'dealership_id': dealershipId,
@@ -91,8 +92,7 @@ class ReportModel {
     };
   }
 
-  /// Preferred way to CREATE a report document using server timestamps.
-  /// Use this instead of `toJson()` when creating new docs (prevents DateTime→Timestamp errors).
+  /// Preferred for CREATEs. Lets Firestore set both timestamps.
   static Map<String, dynamic> createWriteMap({
     required String dealershipId,
     required String vehicleId,
@@ -124,6 +124,7 @@ class ReportModel {
     String? fileUrl,
     String? fileType,
     String? notes,
+    DateTime? createdAt,
     DateTime? updatedAt,
   }) {
     return ReportModel(
@@ -136,8 +137,8 @@ class ReportModel {
       fileUrl: fileUrl ?? this.fileUrl,
       fileType: fileType ?? this.fileType,
       notes: notes ?? this.notes,
-      createdAt: createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

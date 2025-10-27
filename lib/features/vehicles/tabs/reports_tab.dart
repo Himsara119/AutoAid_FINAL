@@ -1,5 +1,4 @@
 // lib/features/vehicles/tabs/reports_tab.dart
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:get/get.dart';
@@ -103,7 +102,7 @@ class ReportsTab extends StatelessWidget {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                '${_fmtDate((r.createdAt ?? r.updatedAt)?.toDate())} • ${r.fileName}',
+                                '${_fmtDate(r.createdAt ?? r.updatedAt)} • ${r.fileName}',
                                 style: t.bodyMedium?.copyWith(color: const Color(0xFF6B7280)),
                                 overflow: TextOverflow.ellipsis,
                               ),

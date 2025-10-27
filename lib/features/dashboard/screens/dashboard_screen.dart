@@ -8,6 +8,13 @@ import '../../../app.dart' show Routes, AppColors;
 // controller that does the Firestore counts
 import '../../vehicles/controllers/vehicle_stats_controller.dart';
 
+// NEW: reuse your existing notifications feed for global alerts
+import '../../notifications/controllers/alerts_feed_controller.dart';
+import '../../notifications/models/alert_model.dart';
+
+// OPTIONAL: resolve current user id for global alerts
+import 'package:firebase_auth/firebase_auth.dart' as fb;
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
 
@@ -16,9 +23,12 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  AlertsFeedController? _dashAlerts; // global alerts feed (top 3 teaser)
+
   @override
   void initState() {
     super.initState();
+
     // Post-frame refresh so the Obx on this screen rebuilds with fresh numbers
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (Get.isRegistered<VehicleStatsController>()) {
@@ -31,10 +41,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  String? _resolveUserId() {
+    try {
+      final uid = fb.FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null && uid.isNotEmpty) return uid;
+    } catch (_) {}
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final stats = Get.find<VehicleStatsController>(); // already created post-login
+
+    // Bind a lightweight global alerts feed for the dashboard teaser (top 3)
+    _dashAlerts ??= Get.put(
+      AlertsFeedController(
+        userId: _resolveUserId(),
+        vehicleId: null,
+        // keep default routes used by your app
+      ),
+      tag: 'dash_alerts_${_resolveUserId() ?? 'none'}',
+      permanent: false,
+    );
 
     return Scaffold(
       body: SafeArea(
@@ -52,14 +81,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         children: [
                           Text('Dashboard', style: t.headlineMedium),
                           const SizedBox(height: 6),
-                          Text('Good morning, Alex', style: t.bodyMedium?.copyWith(color: AppColors.muted)),
+                          Text('AutoAid, Our Solution Free, Your Minds', style: t.bodyMedium?.copyWith(color: AppColors.muted)),
                         ],
                       ),
                     ),
-                    const CircleAvatar(
+                    /*const CircleAvatar(
                       radius: 22,
-                      backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=12'),
-                    ),
+                      backgroundImage: ,
+                    ),*/
                   ],
                 ),
               ),
@@ -151,7 +180,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     title: 'Generate Report',
                     subtitle: 'Create analysis',
                     // IMPORTANT: Open Report Builder unlocked with no preselected vehicle.
-                    // If later you have a known id, pass: arguments: {'vehicleId': someVehicleId}
                     onTap: () => Get.toNamed(
                       Routes.reportBuilder,
                       arguments: {'vehicleId': null},
@@ -247,47 +275,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
 
-            // Alerts & Notifications
+            // Alerts & Notifications (GLOBAL, across vehicles)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
-                child: Text('Alerts & Notifications', style: t.titleLarge),
+                child: Row(
+                  children: [
+                    Text('Alerts & Notifications', style: t.titleLarge),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Open all notifications',
+                      icon: const Icon(Iconsax.arrow_right_3),
+                      onPressed: () => Get.toNamed(Routes.notifications),
+                    ),
+                  ],
+                ),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: const [
-                    AlertCard(
-                      bg: AppColors.dangerBg,
-                      iconBg: Color(0xFFFFE4E4),
-                      iconColor: AppColors.danger,
-                      title: 'Insurance Expired',
-                      subtitle: 'BMW X5 2021 - Expired 3 days ago',
-                      ctaText: 'Renew Now',
-                    ),
-                    SizedBox(height: 12),
-                    AlertCard(
-                      bg: AppColors.warningBg,
-                      iconBg: Color(0xFFFFF0D6),
-                      iconColor: AppColors.warning,
-                      title: 'Service Due',
-                      subtitle: 'Toyota Camry 2020 - Due in 5 days',
-                      ctaText: 'Schedule Service',
-                    ),
-                    SizedBox(height: 12),
-                    AlertCard(
-                      bg: AppColors.infoBg,
-                      iconBg: Color(0xFFDCE8FF),
-                      iconColor: AppColors.info,
-                      title: 'Registration Reminder',
-                      subtitle: 'Honda Accord 2019 - Expires in 30 days',
-                      ctaText: 'View Details',
-                    ),
-                    SizedBox(height: 24),
-                  ],
-                ),
+                child: Obx(() {
+                  final feed = _dashAlerts!;
+                  if (feed.loading.value) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (feed.error.value != null) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text('Failed to load alerts: ${feed.error.value}',
+                          style: t.bodyMedium?.copyWith(color: AppColors.muted)),
+                    );
+                  }
+                  if (feed.alerts.isEmpty) {
+                    return const SizedBox(height: 8); // show nothing if no alerts
+                  }
+
+                  final list = feed.alerts.take(3).toList(); // top 3
+                  return Column(
+                    children: List.generate(list.length, (i) {
+                      final a = list[i];
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: i == list.length - 1 ? 24 : 12),
+                        child: _DashboardAlertCard(
+                          alert: a,
+                          onTap: () => feed.openAlert(a, markRead: true),
+                        ),
+                      );
+                    }),
+                  );
+                }),
               ),
             ),
           ],
@@ -395,63 +435,83 @@ class StatItem extends StatelessWidget {
   }
 }
 
-class AlertCard extends StatelessWidget {
-  const AlertCard({
-    super.key,
-    required this.bg,
-    required this.iconBg,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.ctaText,
-  });
-
-  final Color bg;
-  final Color iconBg;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final String ctaText;
+/// Minimal, self-contained alert card for dashboard teaser (keeps your look)
+class _DashboardAlertCard extends StatelessWidget {
+  const _DashboardAlertCard({required this.alert, required this.onTap});
+  final AlertEntity alert;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-            padding: const EdgeInsets.all(10),
-            child: Icon(Iconsax.warning_2, color: iconColor, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: t.titleMedium),
-                const SizedBox(height: 4),
-                Text(subtitle, style: t.bodyMedium?.copyWith(color: AppColors.muted)),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () {},
-                  child: Text(
-                    ctaText,
+    // Severity mapping to colors similar to your mockups
+    Color bg = AppColors.infoBg;
+    Color iconBg = const Color(0xFFDCE8FF);
+    Color iconColor = AppColors.info;
+
+    switch (alert.severity) {
+      case AlertSeverity.urgent:
+      case AlertSeverity.overdue:
+        bg = AppColors.dangerBg;
+        iconBg = const Color(0xFFFFE4E4);
+        iconColor = AppColors.danger;
+        break;
+      case AlertSeverity.upcoming:
+        bg = AppColors.warningBg;
+        iconBg = const Color(0xFFFFF0D6);
+        iconColor = AppColors.warning;
+        break;
+      default:
+      // keep info
+        break;
+    }
+
+    final vehiclePrefix = (alert.vehicleName ?? '').isNotEmpty ? '${alert.vehicleName} - ' : '';
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+              padding: const EdgeInsets.all(10),
+              child: Icon(Iconsax.warning_2, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(alert.title, style: t.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$vehiclePrefix${alert.message}',
+                    style: t.bodyMedium?.copyWith(color: AppColors.muted),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    alert.dueAt != null
+                        ? 'Due: ${alert.dueAt!.toDate().toString().substring(0, 10)}'
+                        : 'Due: N/A',
                     style: t.labelLarge?.copyWith(color: AppColors.info),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

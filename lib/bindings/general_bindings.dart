@@ -9,7 +9,7 @@ import '../data/repositories/auth_repository.dart';
 import '../features/auth/controller/user_controller.dart';
 import '../features/vehicles/controllers/vehicle_stats_controller.dart';
 import '../data/repositories/notifications_repository.dart';
-import '../features/notifications/controllers/notifications_controller.dart' hide NotificationsRepository;
+import '../features/notifications/controllers/alerts_generator_controller.dart' hide NotificationsRepository;
 
 
 class GeneralBindings extends Bindings {
@@ -26,8 +26,6 @@ class GeneralBindings extends Bindings {
 
     Get.lazyPut<VehicleStatsController>(() => VehicleStatsController(), fenix: true);
 
-    Get.lazyPut<NotificationsRepository>(() => NotificationsRepository(), fenix: true);
-    Get.put<NotificationsController>(NotificationsController(), permanent: true);
 
     // ---- NEW: global AI singletons (reused across screens) ----
     if (!Get.isRegistered<ImageAnalysisService>()) {

@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 
 import '../../profile/models/profile_entity.dart';
+import '../models/report_entity.dart';
 
 /// Small reusable tile for a single report.
 /// - Shows category label, file name, and created date

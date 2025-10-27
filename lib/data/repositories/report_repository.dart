@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart' show Firebase;
 
 import '../../features/profile/models/profile_entity.dart';
+import '../../features/reports/models/report_entity.dart';
 
 /// Firestore repository for vehicle reports:
 /// Path: vehicles/{vehicleId}/reports/{reportId}

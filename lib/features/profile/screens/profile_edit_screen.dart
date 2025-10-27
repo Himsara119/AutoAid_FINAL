@@ -1,6 +1,16 @@
 // lib/features/profile/ui/edit_profile_screen.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+
+// Firebase
+import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
+// Image picker
+import 'package:image_picker/image_picker.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -12,18 +22,80 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _name = TextEditingController(text: 'Sarah Johnson');
-  final _email = TextEditingController(text: 'sarah.johnson@email.com');
-  final _phone = TextEditingController(text: '+1 (555) 123-4567');
-  final _company = TextEditingController(text: 'Premium Auto Group');
-  final _address = TextEditingController(
-      text: '123 Business District, Suite 456 New York, NY 10001');
+  // Controllers
+  final _first = TextEditingController();
+  final _last = TextEditingController();
+  final _email = TextEditingController();
 
-  ImageProvider? _avatar;
+  // Optional extras
+  final _phone = TextEditingController();
+  final _company = TextEditingController();
+  final _address = TextEditingController();
+
+  // State
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+
+  String? _photoUrl;        // persisted URL in Auth
+  File? _pickedFile;        // temporary local selection
+
+  fb.User? _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    try {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+
+      _user = fb.FirebaseAuth.instance.currentUser;
+      if (_user == null) {
+        setState(() => _error = 'No authenticated user.');
+        return;
+      }
+
+      // Parse display name into first/last
+      final dn = _user!.displayName ?? '';
+      final parts = dn.trim().split(RegExp(r'\s+'));
+      _first.text = parts.isNotEmpty ? parts.first : '';
+      _last.text = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+
+      _email.text = _user!.email ?? '';
+      _photoUrl = _user!.photoURL;
+
+      // Optional mirror from Firestore if you store extra fields
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(_user!.uid)
+            .get();
+        if (doc.exists) {
+          final d = doc.data()!;
+          _phone.text = (d['phone'] ?? '') as String;
+          _company.text = (d['company'] ?? '') as String;
+          _address.text = (d['address'] ?? '') as String;
+        }
+      } catch (_) {
+        // non-blocking
+      }
+    } catch (e) {
+      _error = 'Failed to load profile: $e';
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
 
   @override
   void dispose() {
-    _name.dispose();
+    _first.dispose();
+    _last.dispose();
     _email.dispose();
     _phone.dispose();
     _company.dispose();
@@ -41,17 +113,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
+        title: const Text('Edit Profile',
+            style: TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w600)),
         leading: IconButton(
           icon: const Icon(Iconsax.arrow_left_2, color: Color(0xFF111827)),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        title: const Text(
-          'Edit Profile',
-          style: TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w600),
+          onPressed: () => Get.back(id: 2),
         ),
         centerTitle: true,
       ),
-      body: SafeArea(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(_error!,
+              style: t.titleMedium?.copyWith(color: Colors.red)),
+        ),
+      )
+          : SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
           child: Form(
@@ -75,12 +155,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             offset: const Offset(0, 6),
                           )
                         ],
-                        image: _avatar != null
-                            ? DecorationImage(image: _avatar!, fit: BoxFit.cover)
+                        image: (_pickedFile != null || (_photoUrl ?? '').isNotEmpty)
+                            ? DecorationImage(
+                          fit: BoxFit.cover,
+                          image: _pickedFile != null
+                              ? FileImage(_pickedFile!)
+                              : NetworkImage(_photoUrl!) as ImageProvider,
+                        )
                             : null,
                       ),
-                      child: _avatar == null
-                          ? const Icon(Iconsax.user, color: Color(0xFF9CA3AF), size: 40)
+                      child: (_pickedFile == null && (_photoUrl ?? '').isEmpty)
+                          ? const Icon(Iconsax.user,
+                          color: Color(0xFF9CA3AF), size: 40)
                           : null,
                     ),
                     Positioned(
@@ -96,7 +182,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: Colors.white, width: 2),
                           ),
-                          child: const Icon(Iconsax.camera, size: 16, color: Colors.white),
+                          child: const Icon(Iconsax.camera,
+                              size: 16, color: Colors.white),
                         ),
                       ),
                     ),
@@ -114,22 +201,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                 const SizedBox(height: 10),
 
-                // Full Name
-                const _Label('Full Name'),
+                // First Name
+                const _Label('First Name'),
                 const SizedBox(height: 6),
                 _InputBox(
                   child: TextFormField(
-                    controller: _name,
+                    controller: _first,
                     decoration: const InputDecoration(
-                      hintText: 'Sarah Johnson',
+                      hintText: 'Enter your first name',
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
-                    validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Full name is required' : null,
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'First name is required'
+                        : null,
                   ),
                 ),
+                const SizedBox(height: 12),
 
+                // Last Name
+                const _Label('Last Name'),
+                const SizedBox(height: 6),
+                _InputBox(
+                  child: TextFormField(
+                    controller: _last,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter your last name',
+                      border: InputBorder.none,
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Last name is required'
+                        : null,
+                  ),
+                ),
                 const SizedBox(height: 12),
 
                 // Email
@@ -140,9 +247,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
-                      hintText: 'sarah.johnson@email.com',
+                      hintText: 'Enter your email',
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
                     validator: (v) {
                       final x = v?.trim() ?? '';
@@ -154,57 +262,55 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
 
+                // Optional fields
                 const SizedBox(height: 12),
-
-                // Phone
-                const _Label('Phone Number'),
+                const _Label('Phone (optional)'),
                 const SizedBox(height: 6),
                 _InputBox(
                   child: TextFormField(
                     controller: _phone,
                     keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
-                      hintText: '+1 (555) 123-4567',
+                      hintText: '+94...',
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 12),
 
-                // Company
-                const _Label('Company/Dealership Name'),
+                const _Label('Company/Dealership (optional)'),
                 const SizedBox(height: 6),
                 _InputBox(
                   child: TextFormField(
                     controller: _company,
                     decoration: const InputDecoration(
-                      hintText: 'Premium Auto Group',
+                      hintText: 'Company name',
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 12),
 
-                // Address (Optional)
-                const _Label('Address (Optional)'),
+                const _Label('Address (optional)'),
                 const SizedBox(height: 6),
                 _InputBox(
                   child: TextFormField(
                     controller: _address,
                     maxLines: 3,
                     decoration: const InputDecoration(
-                      hintText: '123 Business District, Suite 456 New York, NY 10001',
+                      hintText: 'Street, City, Country',
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
 
                 // Save
                 SizedBox(
@@ -214,13 +320,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF7C3AED),
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 3,
-                      shadowColor: const Color(0xFF7C3AED).withOpacity(0.25),
+                      shadowColor:
+                      const Color(0xFF7C3AED).withOpacity(0.25),
                     ),
-                    onPressed: _save,
-                    child: const Text('Save Changes',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                    onPressed: _saving ? null : _save,
+                    child: _saving
+                        ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                        : const Text('Save Changes',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 16)),
                   ),
                 ),
 
@@ -238,7 +354,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         side: const BorderSide(color: Color(0xFFE6E8ED)),
                       ),
                     ),
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    onPressed: () => Get.back(id: 2),
                     child: const Text(
                       'Cancel',
                       style: TextStyle(
@@ -258,9 +374,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   /* ---------------------------- Actions ---------------------------- */
 
-  void _changePhoto() {
-    // TODO: hook to image_picker or camera. For now just show a sheet.
-    showModalBottomSheet(
+  Future<void> _changePhoto() async {
+    final picker = ImagePicker();
+    final source = await showModalBottomSheet<ImageSource>(
       context: context,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
@@ -275,19 +391,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               _PickerRow(
                 icon: Iconsax.camera,
                 label: 'Take Photo',
-                onTap: () {
-                  Navigator.pop(context);
-                  // setState(() => _avatar = ...);
-                },
+                onTap: () => Navigator.pop(context, ImageSource.camera),
               ),
               const SizedBox(height: 8),
               _PickerRow(
                 icon: Iconsax.image,
                 label: 'Choose from Gallery',
-                onTap: () {
-                  Navigator.pop(context);
-                  // setState(() => _avatar = ...);
-                },
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
               ),
               const SizedBox(height: 8),
               _PickerRow(
@@ -295,8 +405,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 label: 'Remove Photo',
                 danger: true,
                 onTap: () {
-                  setState(() => _avatar = null);
+                  _pickedFile = null;
+                  _photoUrl = '';
                   Navigator.pop(context);
+                  setState(() {});
                 },
               ),
             ],
@@ -304,14 +416,155 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
     );
+
+    if (source == null) return;
+
+    final x = await picker.pickImage(source: source, maxWidth: 1200, imageQuality: 85);
+    if (x == null) return;
+
+    _pickedFile = File(x.path);
+    setState(() {});
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile updated')),
+    if (_user == null) return;
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    try {
+      final futures = <Future<void>>[];
+
+      // 1) Upload avatar if selected
+      String? uploadedUrl = _photoUrl;
+      if (_pickedFile != null) {
+        final ref = FirebaseStorage.instance
+            .ref()
+            .child('users/${_user!.uid}/avatar.jpg');
+        await ref.putFile(_pickedFile!);
+        uploadedUrl = await ref.getDownloadURL();
+        futures.add(_user!.updatePhotoURL(uploadedUrl));
+      }
+
+      // 2) Update display name (First + Last)
+      final dn = '${_first.text.trim()} ${_last.text.trim()}'.trim();
+      if (dn != (_user!.displayName ?? '')) {
+        futures.add(_user!.updateDisplayName(dn));
+      }
+
+      // 3) Update email (re-auth required). No password changing in this build.
+      final newEmail = _email.text.trim();
+      bool sentVerification = false;
+      if (newEmail != (_user!.email ?? '')) {
+        final ok = await _reauthenticateDialog(
+          context,
+          title: 'Confirm Password',
+          message: 'Enter your current password to update email.',
+        );
+        if (ok.ok) {
+          final action = fb.ActionCodeSettings(
+            url: 'https://yourapp.example.com/email-changed',
+            handleCodeInApp: true,
+            androidPackageName: 'com.example.app',
+            androidInstallApp: true,
+            androidMinimumVersion: '21',
+            iOSBundleId: 'com.example.app',
+          );
+          await _user!.verifyBeforeUpdateEmail(newEmail, action);
+          sentVerification = true;
+        } else if (ok.error != null) {
+          Get.snackbar('Error', ok.error!, snackPosition: SnackPosition.BOTTOM);
+        }
+      }
+
+      // Wait for batched Auth updates
+      if (futures.isNotEmpty) {
+        await Future.wait(futures);
+        await _user!.reload();
+        _user = fb.FirebaseAuth.instance.currentUser;
+      }
+
+      // 4) Mirror to Firestore (optional)
+      await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set({
+        'firstName': _first.text.trim(),
+        'lastName': _last.text.trim(),
+        'displayName': dn,
+        'email': _email.text.trim(),
+        'phone': _phone.text.trim(),
+        'company': _company.text.trim(),
+        'address': _address.text.trim(),
+        'photoURL': uploadedUrl ?? _photoUrl ?? '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (sentVerification) {
+        Get.snackbar(
+          'Verify your new email',
+          'We sent a confirmation link to $newEmail. The change applies after you confirm.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        Get.snackbar('Profile updated', 'Your changes were saved.',
+            snackPosition: SnackPosition.BOTTOM);
+      }
+
+      Get.back(id: 2, result: true);
+    } catch (e) {
+      _error = 'Save failed: $e';
+      Get.snackbar('Error', _error!, snackPosition: SnackPosition.BOTTOM);
+      setState(() {});
+    } finally {
+      setState(() => _saving = false);
+    }
+  }
+
+  /* ------------------------ Re-auth helper dialog ------------------------ */
+
+  Future<_ReauthResult> _reauthenticateDialog(BuildContext context,
+      {required String title, required String message}) async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Current password',
+                prefixIcon: Icon(Iconsax.lock),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm')),
+        ],
+      ),
     );
-    Navigator.of(context).maybePop();
+
+    if (ok != true) return _ReauthResult(false, error: 'Cancelled');
+
+    try {
+      final email = _user?.email;
+      if (email == null || email.isEmpty) {
+        return _ReauthResult(false, error: 'No email on account to re-authenticate.');
+      }
+      final cred = fb.EmailAuthProvider.credential(email: email, password: ctrl.text);
+      await _user!.reauthenticateWithCredential(cred);
+      return _ReauthResult(true);
+    } catch (e) {
+      return _ReauthResult(false, error: e.toString());
+    }
   }
 }
 
@@ -381,4 +634,11 @@ class _PickerRow extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     );
   }
+}
+
+/* ----------------------------- Small model ----------------------------- */
+class _ReauthResult {
+  final bool ok;
+  final String? error;
+  _ReauthResult(this.ok, {this.error});
 }

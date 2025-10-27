@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 // Screens
+import 'package:finalapp/features/notifications/screens/notifications_screen.dart';
 import 'package:finalapp/features/profile/screens/about_screen.dart';
 import 'package:finalapp/features/profile/screens/help_screen.dart';
 import 'package:finalapp/features/profile/screens/profile_edit_screen.dart';
@@ -24,14 +25,12 @@ import 'features/ai/bindings/visual_scan_binding.dart';
 import 'features/ai/screens/ai_chat_screen.dart';
 import 'features/ai/screens/ai_scan_screen.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/documents/screens/doc_detail_screen.dart';
 import 'features/mechanics/screens/mechanic_map_screen.dart';
 import 'features/profile/screens/profile_view_screen.dart';
 import 'features/reports/screens/report_builder_screen.dart';
 import 'features/reports/screens/report_preview_screen.dart';
 import 'features/shell/app_shell.dart';
-
-// Reports UI (detail screen)
-import 'features/reports/screens/report_builder_screen.dart';
 
 // Controller for binding
 import 'features/vehicles/controllers/vehicle_detail_controller.dart';
@@ -64,16 +63,24 @@ class App extends StatelessWidget {
           headlineMedium: TextStyle(fontWeight: FontWeight.w700, fontSize: 26),
           titleLarge: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
           titleMedium: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-          bodyMedium:
-          TextStyle(fontWeight: FontWeight.w400, fontSize: 14, height: 1.4),
+          bodyMedium: TextStyle(fontWeight: FontWeight.w400, fontSize: 14, height: 1.4),
           labelLarge: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
       ),
 
       // Do NOT start on a route that needs params
-      initialRoute: Routes.app,
+      initialRoute: Routes.login,
 
       getPages: AppPages.pages,
+
+      // If someone fat-fingers a route name, don’t crash the app
+      unknownRoute: GetPage(
+        name: '/404',
+        page: () => Scaffold(
+          appBar: AppBar(title: const Text('Not Found')),
+          body: const Center(child: Text('Route not found')),
+        ),
+      ),
     );
   }
 }
@@ -83,25 +90,31 @@ class App extends StatelessWidget {
 class Routes {
   static const login = '/login';
   static const app = '/app';
-  static const profile = '/profile';
-  static const addVehicle = '/add-vehicle';
+  static const profile = '/profile';         // profile view as standalone
+  static const profileTab = '/profileTab';   // alias, same screen
+
+  static const addVehicle = '/add-vehicle';  // alias -> list (kept for backward compat)
+  static const vehicleadd = '/vehicleadd';   // actual add vehicle screen
+  static const vehiclelist = '/vehiclelist';
+  static const vehicleDetails = '/vehicleDetails';
+
   static const visualScan = '/visual-scan';
   static const reportBuilder = '/report-builder';
-  static const mechanicFinder = '/mechanic-finder';
-  static const aiScreen = '/aiscreen';
-  static const vehicleadd = '/vehicleadd';
-  static const vehiclelist = '/vehiclelist';
-  static const vehicleDetails = '/vehicleDetails'; // used by list screen
-  static const overview = '/overview';
-  static const chat = '/chat';
   static const reportScreen = '/reportScreen';
-  static const serviceDetail = '/serviceDetail';
 
-  // Randiya UI's To Call
+  static const mechanicFinder = '/mechanic-finder';
+  static const serviceDetail = '/serviceDetail';
+  static const notifications = '/notifications';
+  static const documentdetail = '/documentdetail';
+
+  // Profile subroutes
   static const about = '/about';
-  static const profileEdit = '/profileEdit';
-  static const helpscreen = '/helpscreen';
-  static const profileTab = '/profileTab';
+  static const editProfile = '/profileEdit';
+  static const help = '/helpscreen';
+
+  // AI
+  static const chat = '/chat';
+  static const aiScreen = '/aiscreen';
 }
 
 class AppPages {
@@ -112,29 +125,59 @@ class AppPages {
       transition: Transition.cupertino,
     ),
 
-    // Service detail REQUIRES vehicleId + serviceId.
     GetPage(
-      name: Routes.serviceDetail,
+      name: Routes.documentdetail,
       page: () {
-        final p = Get.parameters;
-        final a = Get.arguments;
-        final vehicleId =
-            p['vehicleId'] ?? (a is Map ? a['vehicleId'] as String? : null);
-        final serviceId =
-            p['serviceId'] ?? (a is Map ? a['serviceId'] as String? : null);
-
-        assert(vehicleId != null && vehicleId!.isNotEmpty, 'vehicleId is required');
-        assert(serviceId != null && serviceId!.isNotEmpty, 'serviceId is required');
-
-        return ServiceDetailScreen(
-          vehicleId: vehicleId!,
-          serviceId: serviceId!,
+        final args = Get.arguments is Map ? Get.arguments as Map : const {};
+        final vehicleId = args['vehicleId']?.toString() ?? '';
+        final documentId = args['documentId']?.toString() ?? '';
+        return DocumentDetailScreen(
+          vehicleId: vehicleId,
+          documentId: documentId,
         );
       },
       transition: Transition.cupertino,
     ),
 
-    // Condition Report screen: requires vehicleId + reportId
+    GetPage(
+      name: Routes.notifications,
+      page: () => const NotificationsScreen(),
+      transition: Transition.cupertino,
+    ),
+
+    // Service detail: requires vehicleId, and either serviceId or a record
+    GetPage(
+      name: Routes.serviceDetail,
+      page: () {
+        final p = Get.parameters;
+        final a = Get.arguments;
+
+        String? vehicleId = p['vehicleId'] ?? (a is Map ? a['vehicleId'] as String? : null);
+        final String? serviceId = p['serviceId'] ?? (a is Map ? a['serviceId'] as String? : null);
+        final dynamic record = (a is Map) ? a['record'] : null;
+
+        if ((vehicleId == null || vehicleId.isEmpty) && record != null) {
+          try {
+            vehicleId = record.vehicleId as String?;
+          } catch (_) {
+            // ignore; assert below will handle
+          }
+        }
+
+        assert(vehicleId != null && vehicleId!.isNotEmpty, 'vehicleId is required');
+        assert(serviceId != null && serviceId.isNotEmpty || record != null,
+        'Provide either serviceId or record for ServiceDetailScreen');
+
+        return ServiceDetailScreen(
+          vehicleId: vehicleId!,
+          serviceId: serviceId,
+          record: record,
+        );
+      },
+      transition: Transition.cupertino,
+    ),
+
+    // Condition Report screen
     GetPage(
       name: Routes.reportScreen,
       page: () {
@@ -159,7 +202,7 @@ class AppPages {
       transition: Transition.cupertino,
     ),
 
-    // Chat route (bind controller)
+    // AI chat route
     GetPage(
       name: Routes.chat,
       page: () => const AiDiagnosisChatScreen(),
@@ -173,27 +216,27 @@ class AppPages {
       transition: Transition.cupertino,
     ),
 
-    // Vehicle details route binds VehicleDetailController with the id
+    // Vehicle details with bound controller
     GetPage(
       name: Routes.vehicleDetails,
       page: () => const VehicleDetailsScreen(),
       binding: BindingsBuilder(() {
         final id = Get.parameters['id'] ?? (Get.arguments as String?);
         assert(id != null && id!.isNotEmpty, 'Vehicle id missing');
-        // tag = id so each vehicle gets its own controller instance
         Get.lazyPut(() => VehicleDetailController(id!), tag: id, fenix: false);
         dev.log('Route bind → vehicle id=$id', name: 'Routes');
       }),
       transition: Transition.cupertino,
     ),
 
+    // Profile subroutes
     GetPage(
-      name: Routes.profileEdit,
+      name: Routes.editProfile,
       page: () => const EditProfileScreen(),
       transition: Transition.cupertino,
     ),
     GetPage(
-      name: Routes.helpscreen,
+      name: Routes.help,
       page: () => const HelpSupportScreen(),
       transition: Transition.cupertino,
     ),
@@ -202,6 +245,8 @@ class AppPages {
       page: () => const ProfileScreen(),
       transition: Transition.cupertino,
     ),
+
+    // Vehicles
     GetPage(
       name: Routes.vehicleadd,
       page: () => const AddVehicleScreen(),
@@ -212,25 +257,29 @@ class AppPages {
       page: () => const VehiclesScreen(),
       transition: Transition.cupertino,
     ),
+
+    // Shell with bottom nav + nested navigators
     GetPage(
       name: Routes.app,
       page: () => const AppShell(),
       transition: Transition.cupertino,
     ),
+
+    // Standalone profile route alias (same screen as profileTab)
     GetPage(
       name: Routes.profile,
       page: () => const ProfileScreen(),
       transition: Transition.cupertino,
     ),
 
-    // Alias used previously; leaving as-is per your setup.
+    // Historical alias: points to list screen per your previous setup
     GetPage(
       name: Routes.addVehicle,
       page: () => const VehiclesScreen(),
       transition: Transition.cupertino,
     ),
 
-    // Visual Scan (bind controller)
+    // Visual Scan
     GetPage(
       name: Routes.visualScan,
       page: () => const VisualScanScreen(),
@@ -238,21 +287,16 @@ class AppPages {
       transition: Transition.cupertino,
     ),
 
-    // Report Builder: vehicleId is OPTIONAL. If null, the screen shows a picker.
+    // Report Builder: optional vehicleId
     GetPage(
       name: Routes.reportBuilder,
       page: () {
         final p = Get.parameters;
         final a = Get.arguments;
 
-        // Supports:
-        //   /report-builder?vehicleId=...
-        //   Get.toNamed(..., arguments: {'vehicleId': '...'})
-        //   Get.toNamed(..., arguments: null)  // open with picker
         final String? vehicleId =
             p['vehicleId'] ?? (a is Map ? a['vehicleId'] as String? : a as String?);
 
-        // No assert: allow null and let the UI handle selection.
         return ReportBuilderScreen(vehicleId: vehicleId);
       },
       transition: Transition.cupertino,
@@ -264,7 +308,7 @@ class AppPages {
       transition: Transition.cupertino,
     ),
 
-    // Alias to the same AI chat screen; bind it too.
+    // AI alias
     GetPage(
       name: Routes.aiScreen,
       page: () => const AiDiagnosisChatScreen(),

@@ -2,6 +2,7 @@ class TImages {
 
   // App Logos
   static const String lightAppLogo = "assets/logos/renovation-icon.png.png";
+  static const String AutoAidAppLogo = "assets/logos/renovation-icon.png.png";
 
   // Social
   static const String google = "assets/logos/google-icon.png";

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../profile/models/profile_entity.dart';
+import '../models/report_entity.dart';
 
 /// Manages reports under a specific vehicle. Supports:
 /// 1) Bound mode: construct with vehicleId -> auto-listen
