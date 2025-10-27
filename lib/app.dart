@@ -69,7 +69,7 @@ class App extends StatelessWidget {
       ),
 
       // Do NOT start on a route that needs params
-      initialRoute: Routes.login,
+      initialRoute: Routes.app,
 
       getPages: AppPages.pages,
 

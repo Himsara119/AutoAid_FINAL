@@ -40,9 +40,22 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Ship-now settings: disable shrinker so R8 can't break anything
+            isMinifyEnabled = false
+            isShrinkResources = false
+
+            // Keep your current quick signing so the APK installs immediately
             signingConfig = signingConfigs.getByName("debug")
+
+            // You can leave proguard files here; they won't run when minify is off
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

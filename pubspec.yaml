@@ -23,6 +23,7 @@ dependencies:
   flutter_native_splash: ^2.4.6
   smooth_page_indicator: ^1.2.1
 
+
   #PDF
   pdf: ^3.11.3
   printing: ^5.14.2
@@ -66,6 +67,13 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  flutter_launcher_icons: ^0.14.4
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/AutoAidLogo2.png"
 
 
   flutter_lints: ^5.0.0
