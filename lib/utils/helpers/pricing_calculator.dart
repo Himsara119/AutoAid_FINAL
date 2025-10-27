@@ -1,3 +1,4 @@
+//Pricing
 class TPricingCalculator {
 
   static double calculateTotalPrice(double productPrice, String location) {
