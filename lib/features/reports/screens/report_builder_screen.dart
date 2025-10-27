@@ -514,7 +514,9 @@ class _SectionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
+    final t = Theme
+        .of(context)
+        .textTheme;
 
     return Container(
       decoration: BoxDecoration(
@@ -526,7 +528,8 @@ class _SectionTile extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+                color: iconBg, borderRadius: BorderRadius.circular(12)),
             padding: const EdgeInsets.all(10),
             child: Icon(icon, color: const Color(0xFF111827), size: 20),
           ),
@@ -535,8 +538,10 @@ class _SectionTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600, height: 1.3)),
-                Text(subtitle, style: t.bodySmall?.copyWith(color: const Color(0xFF6B7280))),
+                Text(title, style: t.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600, height: 1.3)),
+                Text(subtitle, style: t.bodySmall?.copyWith(
+                    color: const Color(0xFF6B7280))),
               ],
             ),
           ),
