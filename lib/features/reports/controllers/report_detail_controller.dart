@@ -31,11 +31,12 @@ class ReportDetailController extends GetxController {
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _sub;
 
-  DocumentReference<Map<String, dynamic>> get _ref => _db
-      .collection('vehicles')
-      .doc(vehicleId)
-      .collection('reports')
-      .doc(reportId);
+  DocumentReference<Map<String, dynamic>> get _ref =>
+      _db
+          .collection('vehicles')
+          .doc(vehicleId)
+          .collection('reports')
+          .doc(reportId);
 
   @override
   void onInit() {
